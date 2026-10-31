@@ -311,7 +311,50 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
           )}
 
           {/* CHILD DIAGRAMS NAVIGATION & CREATION */}
-          {childDiagrams.length > 0 ? (
+          {childDiagrams.length === 1 ? (
+            <div className="space-y-0.5">
+              <button
+                type="button"
+                onClick={() => {
+                  if (onNavigateChildDiagram) {
+                    onNavigateChildDiagram(childDiagrams[0].filename);
+                  }
+                  onClose();
+                }}
+                className={`w-full text-left px-2.5 py-1.5 rounded-lg flex items-center justify-between transition-colors cursor-pointer ${
+                  isDark
+                    ? 'bg-purple-950/40 border border-purple-500/40 text-purple-200 hover:bg-purple-600 hover:text-white'
+                    : 'bg-purple-50 border border-purple-200 text-purple-800 hover:bg-purple-600 hover:text-white'
+                }`}
+                title={`Open child diagram: ${childDiagrams[0].title || childDiagrams[0].filename}`}
+              >
+                <div className="flex items-center gap-2 truncate min-w-0">
+                  <ExternalLink className="w-3.5 h-3.5 text-purple-400 shrink-0" />
+                  <span className="font-bold truncate">Open Child: {childDiagrams[0].title || childDiagrams[0].filename}</span>
+                </div>
+                {childDiagrams[0].diagramType && (
+                  <span className="text-[9px] px-1.5 py-0.5 rounded font-mono uppercase shrink-0 bg-purple-500/20 text-purple-300 border border-purple-500/30">
+                    {childDiagrams[0].diagramType}
+                  </span>
+                )}
+              </button>
+              {!isReadOnly && onOpenChildDiagramModal && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    onOpenChildDiagramModal(selectedNode);
+                    onClose();
+                  }}
+                  className={`w-full text-left px-2.5 py-1 rounded-lg flex items-center gap-2 text-[11px] transition-colors cursor-pointer ${
+                    isDark ? 'hover:bg-slate-800 text-purple-400 hover:text-purple-300' : 'hover:bg-purple-50 text-purple-600'
+                  }`}
+                >
+                  <Plus className="w-3 h-3" />
+                  <span>+ Add Another Child Diagram</span>
+                </button>
+              )}
+            </div>
+          ) : childDiagrams.length > 1 ? (
             <div className="relative">
               <button
                 type="button"

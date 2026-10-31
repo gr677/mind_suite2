@@ -30,8 +30,10 @@ import {
   Palette,
   ArrowLeft,
   Lock,
+  FolderTree,
 } from 'lucide-react';
 import { THEMES } from '../../utils/themeConfig';
+import { workspaceService } from '../../services/workspaceService';
 
 interface AppHeaderProps {
   document: DiagramDocument;
@@ -46,6 +48,7 @@ interface AppHeaderProps {
   activeDiagramFilename?: string;
   navigationHistory?: Array<{ filename: string; diagramName: string; pageId?: string; nodeLabel?: string }>;
   onNavigateBack?: () => void;
+  onSwitchDiagram?: (filename: string) => void;
   onOpenWorkspaceModal: () => void;
   onOpenSettingsModal: () => void;
   onManualSave: () => void;
@@ -85,9 +88,11 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
   onOpenOfflineModal,
   onChangeRole,
   onToggleTheme,
+  onSwitchDiagram,
 }) => {
   const [isPageDropdownOpen, setIsPageDropdownOpen] = useState(false);
   const [isRoleDropdownOpen, setIsRoleDropdownOpen] = useState(false);
+  const [isDiagramDropdownOpen, setIsDiagramDropdownOpen] = useState(false);
 
   const themeDef = THEMES[theme] || THEMES.dark;
   const isDark = themeDef.isDark;
@@ -160,6 +165,83 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
           <span className={isDark ? 'text-slate-500' : 'text-slate-400'}>\data\</span>
           <span className={`${isDark ? 'text-sky-300' : 'text-sky-700'} font-bold`}>{activeDiagramFilename || 'root.json'}</span>
         </button>
+
+        {/* Diagram Files Switcher Dropdown (Click to switch between root.json and child diagrams) */}
+        <div className="relative shrink-0">
+          <button
+            type="button"
+            onClick={() => setIsDiagramDropdownOpen(v => !v)}
+            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs font-mono transition-all cursor-pointer shadow-xs ${
+              isDiagramDropdownOpen
+                ? 'ring-2 ring-sky-500/40 border-sky-500 bg-sky-950/40'
+                : isDark
+                ? 'bg-slate-900 border-slate-800 hover:border-sky-500/50 hover:bg-slate-850 text-slate-300 hover:text-white'
+                : 'bg-slate-100 border-slate-200 hover:border-sky-500/50 hover:bg-slate-200 text-slate-700 hover:text-slate-900'
+            }`}
+            title={`Active Diagram: ${activeDiagramFilename || 'root.json'}. Click to navigate to other diagram files in this workspace.`}
+          >
+            <FolderTree className="w-3.5 h-3.5 text-sky-400" />
+            <span className="text-[10px] uppercase font-mono text-slate-400 hidden md:inline">Diagram:</span>
+            <span className="font-bold text-sky-400 max-w-[130px] truncate">{activeDiagramFilename || 'root.json'}</span>
+            <ChevronDown className={`w-3 h-3 text-slate-400 transition-transform ${isDiagramDropdownOpen ? 'rotate-180 text-sky-400' : ''}`} />
+          </button>
+
+          {isDiagramDropdownOpen && (
+            <div
+              className={`absolute left-0 top-full mt-1.5 w-72 rounded-xl border shadow-2xl p-1.5 z-50 text-xs backdrop-blur-md animate-in fade-in slide-in-from-top-2 ${
+                isDark
+                  ? 'bg-slate-900/95 border-slate-700 text-slate-200'
+                  : 'bg-white/95 border-slate-200 text-slate-800 shadow-slate-300/80'
+              }`}
+              onMouseLeave={() => setIsDiagramDropdownOpen(false)}
+            >
+              <div className={`px-2 py-1 text-[10px] font-mono uppercase border-b flex items-center justify-between mb-1 ${
+                isDark ? 'text-slate-400 border-slate-800' : 'text-slate-500 border-slate-200'
+              }`}>
+                <span>Diagram Files in {activeWorkspaceName || 'Workspace'}</span>
+                <span className="font-bold text-sky-400">{Object.keys(workspaceService.getActiveWorkspace().diagrams).length} files</span>
+              </div>
+              <div className="max-h-60 overflow-y-auto space-y-0.5">
+                {Object.values(workspaceService.getActiveWorkspace().diagrams).map(diag => {
+                  const isActive = diag.filename === (activeDiagramFilename || 'root.json');
+                  const firstPage = diag.document?.pages?.[0];
+                  return (
+                    <button
+                      key={diag.filename}
+                      type="button"
+                      onClick={() => {
+                        onSwitchDiagram?.(diag.filename);
+                        setIsDiagramDropdownOpen(false);
+                      }}
+                      className={`w-full text-left px-2.5 py-1.5 rounded-lg flex items-center justify-between transition-colors cursor-pointer ${
+                        isActive
+                          ? 'bg-sky-600/20 text-sky-300 font-bold border border-sky-500/40'
+                          : isDark
+                          ? 'hover:bg-slate-800 text-slate-300 hover:text-white'
+                          : 'hover:bg-slate-100 text-slate-700'
+                      }`}
+                    >
+                      <div className="truncate min-w-0 flex-1">
+                        <div className="truncate font-semibold flex items-center gap-1.5">
+                          <span>{diag.name || diag.filename}</span>
+                          {firstPage?.diagramType && (
+                            <span className="text-[8px] font-mono uppercase px-1 py-0.2 rounded bg-sky-500/10 text-sky-300 border border-sky-500/20 shrink-0">
+                              {firstPage.diagramType}
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-[10px] font-mono text-slate-400 truncate">
+                          data\{diag.filename}
+                        </div>
+                      </div>
+                      {isActive && <Check className="w-3.5 h-3.5 text-sky-400 shrink-0 ml-1.5" />}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </div>
 
         {/* Save Diagram Button */}
         <button

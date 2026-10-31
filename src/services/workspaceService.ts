@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { DiagramDocument, DiagramType } from '../types/diagram';
+import { DiagramDocument, DiagramPage, DiagramType } from '../types/diagram';
 import { initialDiagramDocument } from '../data/seedDiagrams';
 import { getExampleDiagramForType } from '../data/diagramExamples';
 
@@ -126,28 +126,44 @@ class WorkspaceService {
 
     for (const sw of serverWorkspaces) {
       const existing = this.store.workspaces[sw.id];
-      if (existing) {
-        updatedWorkspaces[sw.id] = {
-          ...existing,
-          name: sw.name || existing.name || sw.id,
-          basePath: sw.basePath || existing.basePath || DEFAULT_BASE_PATH,
-        };
-      } else {
-        updatedWorkspaces[sw.id] = {
-          id: sw.id,
-          name: sw.name || sw.id,
-          basePath: sw.basePath || DEFAULT_BASE_PATH,
-          activeDiagramFilename: 'root.json',
-          diagrams: {
-            'root.json': {
-              filename: 'root.json',
-              name: `${sw.name || sw.id} Root Architecture`,
-              lastModified: new Date().toISOString(),
-              document: initialDiagramDocument,
-            },
-          },
+      const mergedDiagrams: Record<string, WorkspaceDiagram> = existing?.diagrams ? { ...existing.diagrams } : {};
+
+      // If server returned files list for this workspace, ensure every file is registered
+      if (Array.isArray(sw.files)) {
+        for (const file of sw.files) {
+          if (!mergedDiagrams[file.filename]) {
+            mergedDiagrams[file.filename] = {
+              filename: file.filename,
+              name: file.name || file.filename.replace('.json', ''),
+              lastModified: file.lastModified || new Date().toISOString(),
+              document: (file.filename === 'root.json' ? (existing?.diagrams?.['root.json']?.document || initialDiagramDocument) : (undefined as any)),
+            };
+          } else if (file.name && (!mergedDiagrams[file.filename].name || mergedDiagrams[file.filename].name === file.filename)) {
+            mergedDiagrams[file.filename].name = file.name;
+          }
+        }
+      }
+
+      if (!mergedDiagrams['root.json']) {
+        mergedDiagrams['root.json'] = {
+          filename: 'root.json',
+          name: `${sw.name || sw.id} Root Architecture`,
+          lastModified: new Date().toISOString(),
+          document: initialDiagramDocument,
         };
       }
+
+      const activeDiag = existing?.activeDiagramFilename && mergedDiagrams[existing.activeDiagramFilename]
+        ? existing.activeDiagramFilename
+        : 'root.json';
+
+      updatedWorkspaces[sw.id] = {
+        id: sw.id,
+        name: sw.name || existing?.name || sw.id,
+        basePath: sw.basePath || existing?.basePath || DEFAULT_BASE_PATH,
+        activeDiagramFilename: activeDiag,
+        diagrams: mergedDiagrams,
+      };
     }
 
     // Only update if server returned valid workspaces (at least 1)
@@ -541,11 +557,43 @@ class WorkspaceService {
 
   public setActiveDiagram(filename: string): DiagramDocument {
     const ws = this.getActiveWorkspace();
-    if (ws.diagrams[filename]) {
+    if (ws.diagrams[filename] && ws.diagrams[filename].document) {
       ws.activeDiagramFilename = filename;
       this.saveStore();
       return ws.diagrams[filename].document;
     }
+    ws.activeDiagramFilename = filename;
+    this.saveStore();
+    return this.getActiveDiagram().document;
+  }
+
+  public async loadAndSetActiveDiagram(filename: string): Promise<DiagramDocument> {
+    const ws = this.getActiveWorkspace();
+    let safeFilename = filename.trim().toLowerCase();
+    if (!safeFilename.endsWith('.json')) safeFilename += '.json';
+
+    ws.activeDiagramFilename = safeFilename;
+
+    if (ws.diagrams[safeFilename]?.document) {
+      this.saveStore();
+      return ws.diagrams[safeFilename].document;
+    }
+
+    try {
+      const doc = await this.fetchDiagramFromServer(ws.id, safeFilename);
+      ws.diagrams[safeFilename] = {
+        filename: safeFilename,
+        name: doc.name || safeFilename.replace('.json', ''),
+        lastModified: new Date().toISOString(),
+        document: doc,
+      };
+      this.saveStore();
+      return doc;
+    } catch (err) {
+      console.warn(`[WorkspaceService] Could not fetch ${safeFilename} from server:`, err);
+    }
+
+    this.saveStore();
     return this.getActiveDiagram().document;
   }
 
@@ -672,7 +720,8 @@ class WorkspaceService {
     filename: string,
     name: string,
     doc?: DiagramDocument,
-    initialType?: DiagramType
+    initialType?: DiagramType,
+    isEmpty: boolean = false
   ): DiagramDocument {
     const ws = this.getActiveWorkspace();
     let safeFilename = filename.trim().toLowerCase();
@@ -682,6 +731,31 @@ class WorkspaceService {
     let newDoc: DiagramDocument;
     if (doc) {
       newDoc = doc;
+    } else if (initialType && isEmpty) {
+      const cleanPage: DiagramPage = {
+        id: `page-${initialType}-${Date.now()}`,
+        title: name || `${initialType.toUpperCase()} Diagram`,
+        diagramType: initialType,
+        description: `New ${initialType.toUpperCase()} child diagram.`,
+        viewport: { x: 50, y: 50, zoom: 1 },
+        nodes: [],
+        edges: [],
+      };
+      newDoc = {
+        id: `doc-${ws.id}-${Date.now()}`,
+        name: name || safeFilename.replace('.json', ''),
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        activePageId: cleanPage.id,
+        settings: {
+          gridSnap: true,
+          showGrid: true,
+          theme: 'dark',
+          showMinimap: true,
+        },
+        versions: [],
+        pages: [cleanPage],
+      };
     } else if (initialType) {
       const starterPage = getExampleDiagramForType(initialType);
       newDoc = {
@@ -713,7 +787,6 @@ class WorkspaceService {
       lastModified: new Date().toISOString(),
       document: newDoc,
     };
-    ws.activeDiagramFilename = safeFilename;
     this.saveStore();
 
     // Persist to server disk

@@ -29,6 +29,7 @@ interface CreateChildDiagramModalProps {
   onClose: () => void;
   onNavigateToChildDiagram: (filename: string) => void;
   onLinkChildDiagram: (nodeId: string, filename: string, title: string, diagramType: DiagramType) => void;
+  onCreateAndNavigateChildDiagram?: (nodeId: string, filename: string, title: string, diagramType: DiagramType) => void | Promise<void>;
 }
 
 export const CreateChildDiagramModal: React.FC<CreateChildDiagramModalProps> = ({
@@ -39,6 +40,7 @@ export const CreateChildDiagramModal: React.FC<CreateChildDiagramModalProps> = (
   onClose,
   onNavigateToChildDiagram,
   onLinkChildDiagram,
+  onCreateAndNavigateChildDiagram,
 }) => {
   const themeDef = THEMES[theme] || THEMES.dark;
   const isDark = themeDef.isDark;
@@ -76,7 +78,7 @@ export const CreateChildDiagramModal: React.FC<CreateChildDiagramModalProps> = (
   const activeWs = workspaceService.getActiveWorkspace();
   const existingDiagrams = Object.values(activeWs.diagrams);
 
-  const handleCreate = (e: React.FormEvent) => {
+  const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim() || !filename.trim()) return;
 
@@ -84,18 +86,20 @@ export const CreateChildDiagramModal: React.FC<CreateChildDiagramModalProps> = (
     if (!safeFilename.endsWith('.json')) safeFilename += '.json';
     safeFilename = safeFilename.replace(/[^a-z0-9._-]/g, '_');
 
-    // Create a new diagram in the workspace with its own dedicated JSON file and starter model for selected type
-    workspaceService.createDiagram(safeFilename, title.trim(), undefined, selectedType);
+    if (onCreateAndNavigateChildDiagram) {
+      await onCreateAndNavigateChildDiagram(parentNode.id, safeFilename, title.trim(), selectedType);
+      onClose();
+      return;
+    }
 
-    // Link the parent node to this child diagram JSON file
+    // Fallback if not provided:
+    workspaceService.createDiagram(safeFilename, title.trim(), undefined, selectedType, true);
     onLinkChildDiagram(parentNode.id, safeFilename, title.trim(), selectedType);
-
-    // Immediately navigate to the child diagram
     onNavigateToChildDiagram(safeFilename);
     onClose();
   };
 
-  const handleLinkExisting = (e: React.FormEvent) => {
+  const handleLinkExisting = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedExistingFile) return;
 

@@ -35,12 +35,18 @@ import {
 import { THEMES } from '../../utils/themeConfig';
 import { WorkspaceDropdown } from './WorkspaceDropdown';
 import { DiagramDocument } from '../../types/diagram';
+import { workspaceService } from '../../services/workspaceService';
+import { ArrowLeft, FolderTree, FileCode, Check } from 'lucide-react';
 
 interface ShapePaletteSidebarProps {
   currentDiagramType: DiagramType;
   userRole: UserRole;
   selectedCategory: string;
   theme?: AppTheme;
+  activeDiagramFilename?: string;
+  navigationHistory?: Array<{ filename: string; diagramName: string; pageId?: string; nodeLabel?: string }>;
+  onNavigateBack?: () => void;
+  onSwitchDiagram?: (filename: string) => void;
   onSelectCategory: (cat: string) => void;
   onSelectTemplate: (templateId: string) => void;
   onOpenGallery: () => void;
@@ -52,12 +58,17 @@ export const ShapePaletteSidebar: React.FC<ShapePaletteSidebarProps> = ({
   userRole,
   selectedCategory,
   theme = 'dark',
+  activeDiagramFilename,
+  navigationHistory = [],
+  onNavigateBack,
+  onSwitchDiagram,
   onSelectCategory,
   onSelectTemplate,
   onOpenGallery,
   onLoadDiagram,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
+  const [isDiagramsListExpanded, setIsDiagramsListExpanded] = useState(false);
 
   const categories = [
     { id: 'all', label: 'All Diagram Shapes' },
@@ -140,6 +151,80 @@ export const ShapePaletteSidebar: React.FC<ShapePaletteSidebarProps> = ({
         {onLoadDiagram && (
           <WorkspaceDropdown onLoadDiagram={onLoadDiagram} theme={theme} />
         )}
+
+        {/* Back to Parent Diagram Button when in a Child Diagram */}
+        {navigationHistory.length > 0 && onNavigateBack && (
+          <button
+            type="button"
+            onClick={onNavigateBack}
+            className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold shadow-md shadow-purple-600/30 cursor-pointer transition-all animate-in fade-in"
+            title={`Return to parent diagram (${navigationHistory[navigationHistory.length - 1].diagramName || 'root.json'})`}
+          >
+            <div className="flex items-center gap-1.5 truncate min-w-0">
+              <ArrowLeft className="w-3.5 h-3.5 shrink-0" />
+              <span className="truncate">Back to {navigationHistory[navigationHistory.length - 1].nodeLabel ? `Node "${navigationHistory[navigationHistory.length - 1].nodeLabel}"` : 'Parent'}</span>
+            </div>
+            <span className="text-[10px] font-mono opacity-80 shrink-0">Parent ➔</span>
+          </button>
+        )}
+
+        {/* Workspace Diagrams Files Switcher Accordion */}
+        {(() => {
+          const ws = workspaceService.getActiveWorkspace();
+          const diagramList = Object.values(ws.diagrams);
+          if (diagramList.length <= 1 && !isDiagramsListExpanded) return null;
+          return (
+            <div className={`rounded-xl border p-2 text-xs space-y-1.5 ${themeDef.isDark ? 'bg-slate-950/60 border-slate-800' : 'bg-slate-50 border-slate-200'}`}>
+              <button
+                type="button"
+                onClick={() => setIsDiagramsListExpanded(v => !v)}
+                className="w-full flex items-center justify-between text-[11px] font-bold text-sky-400 cursor-pointer"
+                title="Click to view and switch between diagram files in this workspace"
+              >
+                <div className="flex items-center gap-1.5">
+                  <FolderTree className="w-3.5 h-3.5 text-sky-400" />
+                  <span>Workspace Diagrams ({diagramList.length})</span>
+                </div>
+                <ChevronDown className={`w-3 h-3 text-slate-400 transition-transform ${isDiagramsListExpanded ? 'rotate-180 text-sky-400' : ''}`} />
+              </button>
+              {isDiagramsListExpanded && (
+                <div className="space-y-1 max-h-40 overflow-y-auto pt-1 border-t border-slate-800/60">
+                  {diagramList.map(diag => {
+                    const isCurrent = diag.filename === (activeDiagramFilename || ws.activeDiagramFilename || 'root.json');
+                    const firstType = diag.document?.pages?.[0]?.diagramType;
+                    return (
+                      <button
+                        key={diag.filename}
+                        type="button"
+                        onClick={() => onSwitchDiagram?.(diag.filename)}
+                        className={`w-full text-left px-2 py-1.5 rounded-lg flex items-center justify-between gap-1 transition-colors cursor-pointer text-xs ${
+                          isCurrent
+                            ? 'bg-sky-600/20 text-sky-300 font-bold border border-sky-500/40'
+                            : themeDef.isDark
+                            ? 'hover:bg-slate-800 text-slate-300'
+                            : 'hover:bg-slate-200 text-slate-700'
+                        }`}
+                      >
+                        <div className="truncate min-w-0 flex items-center gap-1.5">
+                          <FileCode className="w-3 h-3 text-sky-400 shrink-0" />
+                          <span className="truncate">{diag.name || diag.filename}</span>
+                        </div>
+                        <div className="flex items-center gap-1 shrink-0">
+                          {firstType && (
+                            <span className="text-[8px] font-mono uppercase px-1 py-0.2 rounded bg-sky-500/15 text-sky-300 border border-sky-500/20">
+                              {firstType}
+                            </span>
+                          )}
+                          {isCurrent && <Check className="w-3 h-3 text-sky-400" />}
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          );
+        })()}
 
         {/* Locked Active Diagram Type Banner */}
         <div

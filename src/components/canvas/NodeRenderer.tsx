@@ -26,6 +26,7 @@ import {
   Milestone,
   Users,
   FolderTree,
+  ChevronDown,
 } from 'lucide-react';
 import { getNodeBackgroundStyle, getDarkerShade } from '../../utils/colorUtils';
 
@@ -70,6 +71,7 @@ export const NodeRenderer: React.FC<NodeRendererProps> = ({
   const [editedLabel, setEditedLabel] = React.useState(node.label);
   const [isHovered, setIsHovered] = React.useState(false);
   const [mouseEntryPos, setMouseEntryPos] = React.useState<{ x: number; y: number } | null>(null);
+  const [showChildQuickMenu, setShowChildQuickMenu] = React.useState(false);
   const activeCollaborator = collaborators.find(c => c.selectedNodeId === node.id);
 
   // Render anchor handles on hover for wiring connections
@@ -1271,25 +1273,26 @@ export const NodeRenderer: React.FC<NodeRendererProps> = ({
         if (childDiagrams.length === 1) {
           const single = childDiagrams[0];
           return (
-            <div className="absolute -top-3 right-2 z-30 flex items-center gap-1">
+            <div className="absolute -top-3.5 right-1 z-30 flex items-center gap-1">
               <button
                 type="button"
                 onClick={e => {
                   e.stopPropagation();
                   onNavigateChildDiagram?.(single.filename);
                 }}
-                className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-purple-600 hover:bg-purple-500 text-white text-[9px] font-bold shadow-lg shadow-purple-900/50 border border-purple-300/40 cursor-pointer transition-all hover:scale-105 pointer-events-auto"
-                title={`Click to navigate to child diagram: ${single.title || single.filename} (${(single.diagramType || 'diagram').toUpperCase()}) • Right-click node for all options`}
+                className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-purple-600 hover:bg-purple-500 text-white text-[9px] font-bold shadow-lg shadow-purple-900/50 border border-purple-300/40 cursor-pointer transition-all hover:scale-105 pointer-events-auto group"
+                title={`Click to open child diagram: ${single.title || single.filename} (${(single.diagramType || 'diagram').toUpperCase()})`}
               >
-                <ExternalLink className="w-2.5 h-2.5" />
-                <span className="truncate max-w-[120px]">
+                <ExternalLink className="w-2.5 h-2.5 text-purple-200" />
+                <span className="truncate max-w-[130px]">
                   {single.title || single.filename.replace('.json', '')}
                 </span>
                 {single.diagramType && (
-                  <span className="text-[8px] opacity-80 uppercase font-mono">
-                    [{single.diagramType}]
+                  <span className="text-[8px] opacity-80 uppercase font-mono px-1 py-0.2 rounded bg-purple-800/60">
+                    {single.diagramType}
                   </span>
                 )}
+                <span className="text-purple-200 font-bold group-hover:translate-x-0.5 transition-transform">→</span>
               </button>
               {isSelected && !isReadOnly && (
                 <button
@@ -1308,19 +1311,75 @@ export const NodeRenderer: React.FC<NodeRendererProps> = ({
           );
         } else if (childDiagrams.length > 1) {
           return (
-            <div className="absolute -top-3 right-2 z-30 flex items-center gap-1">
-              <button
-                type="button"
-                onClick={e => {
-                  e.stopPropagation();
-                  onNavigateChildDiagram?.(childDiagrams[0].filename);
-                }}
-                className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-purple-700 hover:bg-purple-600 text-white text-[9px] font-bold shadow-lg shadow-purple-950/60 border border-purple-300/50 cursor-pointer transition-all hover:scale-105 pointer-events-auto"
-                title={`${childDiagrams.length} child diagrams attached! Click to open "${childDiagrams[0].title || childDiagrams[0].filename}" or right-click this node to see all children.`}
-              >
-                <FolderTree className="w-2.5 h-2.5" />
-                <span>{childDiagrams.length} Child Diagrams</span>
-              </button>
+            <div className="absolute -top-3.5 right-1 z-30 flex items-center gap-1">
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={e => {
+                    e.stopPropagation();
+                    setShowChildQuickMenu(prev => !prev);
+                  }}
+                  className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-purple-700 hover:bg-purple-600 text-white text-[9px] font-bold shadow-lg shadow-purple-950/60 border border-purple-300/50 cursor-pointer transition-all hover:scale-105 pointer-events-auto"
+                  title="Click to view all child diagrams attached to this node"
+                >
+                  <FolderTree className="w-2.5 h-2.5 text-purple-200" />
+                  <span>{childDiagrams.length} Child Diagrams</span>
+                  <ChevronDown className={`w-2.5 h-2.5 transition-transform ${showChildQuickMenu ? 'rotate-180' : ''}`} />
+                </button>
+
+                {showChildQuickMenu && (
+                  <div
+                    className="absolute right-0 top-full mt-1 w-60 rounded-xl bg-slate-900/95 border border-purple-500/40 shadow-2xl p-1.5 text-xs z-50 backdrop-blur-md animate-in fade-in"
+                    onClick={e => e.stopPropagation()}
+                    onMouseLeave={() => setShowChildQuickMenu(false)}
+                  >
+                    <div className="px-2 py-1 text-[10px] font-mono uppercase text-purple-300 border-b border-slate-800 flex items-center justify-between">
+                      <span>Navigate to Child Diagram</span>
+                      <span className="font-bold">{childDiagrams.length}</span>
+                    </div>
+                    <div className="max-h-48 overflow-y-auto py-1 space-y-0.5">
+                      {childDiagrams.map((child, idx) => (
+                        <button
+                          key={child.id || child.filename || idx}
+                          type="button"
+                          onClick={e => {
+                            e.stopPropagation();
+                            setShowChildQuickMenu(false);
+                            onNavigateChildDiagram?.(child.filename);
+                          }}
+                          className="w-full text-left px-2 py-1.5 rounded-md hover:bg-purple-900/40 text-slate-200 hover:text-white flex items-center justify-between gap-1 transition-colors cursor-pointer"
+                        >
+                          <div className="truncate min-w-0 font-medium">
+                            {child.title || child.filename}
+                          </div>
+                          {child.diagramType && (
+                            <span className="text-[8px] uppercase font-mono px-1 py-0.2 rounded bg-purple-500/20 text-purple-300 border border-purple-500/30 shrink-0">
+                              {child.diagramType}
+                            </span>
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                    {!isReadOnly && (
+                      <div className="pt-1 mt-1 border-t border-slate-800">
+                        <button
+                          type="button"
+                          onClick={e => {
+                            e.stopPropagation();
+                            setShowChildQuickMenu(false);
+                            onOpenChildDiagramModal?.(node);
+                          }}
+                          className="w-full text-left px-2 py-1 rounded text-purple-400 hover:text-purple-300 hover:bg-purple-950/40 flex items-center gap-1.5 text-[10px] font-semibold cursor-pointer"
+                        >
+                          <Plus className="w-3 h-3" />
+                          <span>+ Add Another Child Diagram</span>
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
               {isSelected && !isReadOnly && (
                 <button
                   type="button"
