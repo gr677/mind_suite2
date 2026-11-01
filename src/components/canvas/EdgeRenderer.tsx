@@ -11,6 +11,7 @@ interface EdgeRendererProps {
   sourceNode?: DiagramNode;
   targetNode?: DiagramNode;
   isSelected?: boolean;
+  isDeemphasized?: boolean;
   onSelect?: (edgeId: string) => void;
   onContextMenu?: (edgeId: string, e: React.MouseEvent) => void;
 }
@@ -20,6 +21,7 @@ export const EdgeRenderer: React.FC<EdgeRendererProps> = ({
   sourceNode,
   targetNode,
   isSelected,
+  isDeemphasized = false,
   onSelect,
   onContextMenu,
 }) => {
@@ -115,6 +117,10 @@ export const EdgeRenderer: React.FC<EdgeRendererProps> = ({
   return (
     <g
       className="cursor-pointer group"
+      style={{
+        opacity: isDeemphasized ? 0.15 : 1,
+        transition: 'opacity 0.2s ease',
+      }}
       onClick={e => {
         e.stopPropagation();
         onSelect?.(edge.id);

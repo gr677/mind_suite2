@@ -31,6 +31,7 @@ import {
   BookOpen,
   Archive,
   Lock,
+  Circle,
 } from 'lucide-react';
 import { THEMES } from '../../utils/themeConfig';
 import { WorkspaceDropdown } from './WorkspaceDropdown';
@@ -135,6 +136,7 @@ export const ShapePaletteSidebar: React.FC<ShapePaletteSidebarProps> = ({
       case 'TrendingUp': return <TrendingUp className="w-4 h-4 text-amber-400" />;
       case 'GitBranch': return <GitBranch className="w-4 h-4 text-rose-400" />;
       case 'Sparkles': return <Sparkles className="w-4 h-4 text-purple-400" />;
+      case 'Circle': return <Circle className="w-4 h-4 text-fuchsia-400" />;
       case 'Archive': return <Archive className="w-4 h-4 text-cyan-400" />;
       default: return <Grid className="w-4 h-4 text-slate-400" />;
     }

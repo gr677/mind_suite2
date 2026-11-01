@@ -35,6 +35,9 @@ interface NodeRendererProps {
   isSelected: boolean;
   isDragging: boolean;
   collaborators: Collaborator[];
+  isDeemphasized?: boolean;
+  onMouseEnterNode?: (nodeId: string) => void;
+  onMouseLeaveNode?: (nodeId: string) => void;
   onNodeMouseDown?: (nodeId: string, e: React.MouseEvent) => void;
   onStartResize?: (
     nodeId: string,
@@ -56,6 +59,9 @@ export const NodeRenderer: React.FC<NodeRendererProps> = ({
   isSelected,
   isDragging,
   collaborators,
+  isDeemphasized = false,
+  onMouseEnterNode,
+  onMouseLeaveNode,
   onNodeMouseDown,
   onStartResize,
   onDrillDown,
@@ -1132,7 +1138,39 @@ export const NodeRenderer: React.FC<NodeRendererProps> = ({
         );
       }
 
-      // 24. Mindmap Node & Standard Flowchart Process Box
+      // 24. Mindmap Oval Node (Geometric Ellipse / Oval for Mind Maps)
+      case 'mindmap-oval': {
+        const fill = node.style?.fill || 'rgba(217, 70, 239, 0.85)';
+        const stroke = node.style?.stroke || '#f0abfc';
+        const strokeWidth = node.style?.strokeWidth ?? 2;
+        const textColor = node.style?.textColor || '#ffffff';
+        const bgStyle = getNodeBackgroundStyle(fill, node.style?.gradient, 'rgba(217, 70, 239, 0.85)');
+
+        return (
+          <div
+            className="flex flex-col items-center justify-center h-full p-3 shadow-xl text-center transition-all border-2 select-none"
+            style={{
+              ...bgStyle,
+              borderColor: stroke,
+              borderWidth: `${strokeWidth}px`,
+              borderStyle: node.style?.strokeDasharray ? 'dashed' : 'solid',
+              borderRadius: '50%',
+              color: textColor,
+            }}
+          >
+            <span className="text-xs font-semibold leading-snug line-clamp-3 select-none px-2">
+              {node.label}
+            </span>
+            {node.data?.level !== undefined && (
+              <span className="text-[9px] font-mono opacity-80 mt-0.5">
+                Level {node.data.level}
+              </span>
+            )}
+          </div>
+        );
+      }
+
+      // 25. Mindmap Node & Standard Flowchart Process Box
       case 'mindmap-node':
       case 'flow-process':
       case 'vsm-step':
@@ -1217,9 +1255,16 @@ export const NodeRenderer: React.FC<NodeRendererProps> = ({
         width: `${node.width}px`,
         height: `${node.height}px`,
         touchAction: 'none',
+        opacity: isDeemphasized ? 0.22 : 1,
+        filter: isDeemphasized ? 'grayscale(45%)' : 'none',
+        transition: 'opacity 0.2s ease, filter 0.2s ease, box-shadow 0.2s ease',
       }}
-      className={`absolute group select-none transition-shadow pointer-events-auto ${
-        isSelected ? 'ring-2 ring-blue-400 ring-offset-2 ring-offset-slate-950 z-20' : 'z-10'
+      className={`absolute group select-none pointer-events-auto ${
+        isSelected
+          ? 'ring-2 ring-blue-400 ring-offset-2 ring-offset-slate-950 z-20 shadow-xl'
+          : isDeemphasized
+          ? 'z-0'
+          : 'z-10'
       } ${isDragging ? 'cursor-grabbing opacity-90' : 'cursor-grab'}`}
       onMouseEnter={e => {
         const rect = e.currentTarget.getBoundingClientRect();
@@ -1228,10 +1273,12 @@ export const NodeRenderer: React.FC<NodeRendererProps> = ({
           y: e.clientY - rect.top,
         });
         setIsHovered(true);
+        onMouseEnterNode?.(node.id);
       }}
       onMouseLeave={() => {
         setIsHovered(false);
         setMouseEntryPos(null);
+        onMouseLeaveNode?.(node.id);
       }}
       onMouseDown={e => {
         if (

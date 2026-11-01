@@ -134,23 +134,6 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
           </button>
         )}
 
-        {/* Workspace Storage Path Pill (C:\omnimind\<workspace>\data\<filename>) */}
-        <button
-          onClick={onOpenWorkspaceModal}
-          className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs font-mono transition-all cursor-pointer shadow-sm group shrink-0 ${
-            isDark
-              ? 'bg-slate-900 border-slate-800 hover:border-amber-500/50 hover:bg-slate-850 text-slate-300 hover:text-white'
-              : 'bg-slate-100 border-slate-200 hover:border-amber-500/50 hover:bg-slate-200 text-slate-700 hover:text-slate-900'
-          }`}
-          title={`Click to manage workspaces & diagrams (C:\\omnimind\\${activeWorkspaceName || 'workspace1'}\\data\\${activeDiagramFilename || 'root.json'})`}
-        >
-          <Folder className="w-3.5 h-3.5 text-amber-500 group-hover:scale-110 transition-transform" />
-          <span className={`hidden xl:inline ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>C:\omnimind\</span>
-          <span className={`${isDark ? 'text-amber-300' : 'text-amber-700'} font-bold`}>{activeWorkspaceName || 'workspace1'}</span>
-          <span className={isDark ? 'text-slate-500' : 'text-slate-400'}>\data\</span>
-          <span className={`${isDark ? 'text-sky-300' : 'text-sky-700'} font-bold`}>{activeDiagramFilename || 'root.json'}</span>
-        </button>
-
         {/* Diagram Files Switcher Dropdown (Click to switch between root.json and child diagrams) */}
         <div className="relative shrink-0">
           <button
@@ -309,6 +292,24 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
                 <span>Tools &amp; Integration</span>
                 <span className="font-bold text-blue-400">OmniMind</span>
               </div>
+
+              {/* Workspaces & Storage */}
+              <button
+                type="button"
+                onClick={() => {
+                  setIsToolsDropdownOpen(false);
+                  onOpenWorkspaceModal();
+                }}
+                className={`w-full text-left px-2.5 py-2 rounded-lg flex items-center justify-between transition-colors cursor-pointer ${
+                  isDark ? 'hover:bg-slate-800 text-slate-200' : 'hover:bg-slate-100 text-slate-800'
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <Folder className="w-3.5 h-3.5 text-amber-400" />
+                  <span>Workspaces &amp; Storage</span>
+                </div>
+                <span className="text-[10px] font-mono text-slate-400">{activeWorkspaceName || 'workspace1'}</span>
+              </button>
 
               {/* Version History */}
               <button

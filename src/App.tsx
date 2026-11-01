@@ -803,12 +803,11 @@ export default function App() {
     const ws = workspaceService.getActiveWorkspace();
     const filename = ws.activeDiagramFilename || 'root.json';
     workspaceService.saveCurrentDiagram(document, filename);
-    // Persist synchronously to server disk so save modal reflects latest disk write
+    // Persist synchronously to server disk
     const result = await workspaceService.saveCurrentDiagramToServer(document, filename);
     if (!result.success) {
       console.error('[OmniMind App] Save diagram failed:', result.error, result.details);
       setSaveStatus('unsaved');
-      setIsSaveSuccessModalOpen(true);
       return;
     }
     collaborationService.addActivity(
@@ -817,7 +816,6 @@ export default function App() {
       `Saved diagram to ${ws.name}/${filename}`
     );
     setSaveStatus('saved');
-    setIsSaveSuccessModalOpen(true);
     setTimeout(() => setSaveStatus('idle'), 2500);
   }, [document]);
 

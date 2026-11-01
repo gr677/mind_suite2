@@ -36,7 +36,6 @@ import { ContextMenu, ContextMenuPosition } from './ContextMenu';
 import { NodeContentEditModal } from '../modals/NodeContentEditModal';
 import { THEMES } from '../../utils/themeConfig';
 import { getDefaultConnectorStyleForDiagram } from '../../utils/diagramConnectorConfig';
-import { PageTearTransition } from './PageTearTransition';
 
 interface DiagramCanvasProps {
   nodes: DiagramNode[];
@@ -144,6 +143,28 @@ export const DiagramCanvas: React.FC<DiagramCanvasProps> = ({
     anchor: 'top' | 'right' | 'bottom' | 'left';
   } | null>(null);
   const [currentMousePos, setCurrentMousePos] = useState({ x: 0, y: 0 });
+
+  // Hover state for highlighting connected/linked nodes (Change 2)
+  const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
+
+  // Active focus node for network connectivity highlight (hover takes priority, fallback to selection)
+  const activeFocusNodeId = hoveredNodeId || selectedNodeId;
+
+  // Set of node IDs that are linked to the active focus node
+  const linkedNodeIds = React.useMemo(() => {
+    if (!activeFocusNodeId) return null;
+    const set = new Set<string>();
+    set.add(activeFocusNodeId);
+    for (const e of edges) {
+      if (e.sourceNodeId === activeFocusNodeId) {
+        set.add(e.targetNodeId);
+      }
+      if (e.targetNodeId === activeFocusNodeId) {
+        set.add(e.sourceNodeId);
+      }
+    }
+    return set;
+  }, [activeFocusNodeId, edges]);
 
   const isReadOnly = userRole === 'viewer';
 
@@ -992,6 +1013,9 @@ export const DiagramCanvas: React.FC<DiagramCanvasProps> = ({
         {edges.map(edge => {
           const source = nodes.find(n => n.id === edge.sourceNodeId);
           const target = nodes.find(n => n.id === edge.targetNodeId);
+          const isEdgeConnected = activeFocusNodeId
+            ? (edge.sourceNodeId === activeFocusNodeId || edge.targetNodeId === activeFocusNodeId)
+            : true;
           return (
             <EdgeRenderer
               key={edge.id}
@@ -999,6 +1023,7 @@ export const DiagramCanvas: React.FC<DiagramCanvasProps> = ({
               sourceNode={source}
               targetNode={target}
               isSelected={selectedEdgeId === edge.id}
+              isDeemphasized={activeFocusNodeId ? !isEdgeConnected : false}
               onSelect={onSelectEdge}
               onContextMenu={handleEdgeContextMenu}
             />
@@ -1034,27 +1059,33 @@ export const DiagramCanvas: React.FC<DiagramCanvasProps> = ({
           transformOrigin: '0 0',
         }}
       >
-        {nodes.map(node => (
-          <NodeRenderer
-            key={node.id}
-            node={node}
-            isSelected={selectedNodeId === node.id}
-            isDragging={draggingNodeId === node.id}
-            collaborators={collaborators}
-            onNodeMouseDown={handleNodeMouseDown}
-            onStartResize={handleStartResize}
-            onDrillDown={onDrillDown}
-            onStartConnection={(nodeId, anchor) => {
-              setConnectingFrom({ nodeId, anchor });
-            }}
-            onOpenDoc={onOpenDoc}
-            onUpdateLabel={onUpdateNodeLabel}
-            onNodeContextMenu={handleNodeContextMenu}
-            onOpenChildDiagramModal={onOpenChildDiagramModal}
-            onNavigateChildDiagram={onNavigateChildDiagram}
-            isReadOnly={isReadOnly}
-          />
-        ))}
+        {nodes.map(node => {
+          const isNodeLinked = linkedNodeIds ? linkedNodeIds.has(node.id) : true;
+          return (
+            <NodeRenderer
+              key={node.id}
+              node={node}
+              isSelected={selectedNodeId === node.id}
+              isDragging={draggingNodeId === node.id}
+              collaborators={collaborators}
+              isDeemphasized={linkedNodeIds ? !isNodeLinked : false}
+              onMouseEnterNode={setHoveredNodeId}
+              onMouseLeaveNode={() => setHoveredNodeId(null)}
+              onNodeMouseDown={handleNodeMouseDown}
+              onStartResize={handleStartResize}
+              onDrillDown={onDrillDown}
+              onStartConnection={(nodeId, anchor) => {
+                setConnectingFrom({ nodeId, anchor });
+              }}
+              onOpenDoc={onOpenDoc}
+              onUpdateLabel={onUpdateNodeLabel}
+              onNodeContextMenu={handleNodeContextMenu}
+              onOpenChildDiagramModal={onOpenChildDiagramModal}
+              onNavigateChildDiagram={onNavigateChildDiagram}
+              isReadOnly={isReadOnly}
+            />
+          );
+        })}
 
         {/* Real-Time Live Collaborator Cursors (Configured in Settings) */}
         {settings?.showCollaborators &&
@@ -1168,12 +1199,6 @@ export const DiagramCanvas: React.FC<DiagramCanvasProps> = ({
         onSaveNode={updated => {
           onUpdateNodes(nodes.map(n => (n.id === updated.id ? updated : n)));
         }}
-      />
-
-      {/* Mac-style Page Tearing Transition Effect */}
-      <PageTearTransition
-        transitionKey={`${activeDiagramFilename || 'root.json'}_${pageId || 'main'}`}
-        isDark={themeDef.isDark}
       />
     </div>
   );

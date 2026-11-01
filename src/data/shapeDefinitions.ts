@@ -731,6 +731,33 @@ export const SHAPE_TEMPLATES: ShapeTemplate[] = [
       data: { level: 1 },
     },
   },
+  {
+    id: 'mindmap-oval',
+    category: 'mindmap',
+    categoryLabel: 'Mind Mapping & Ideation',
+    name: 'Mind Map Oval',
+    iconName: 'Circle',
+    description: 'Elliptical / oval idea node for core concepts or branches',
+    defaultNode: {
+      type: 'mindmap-oval',
+      label: 'Topic Oval',
+      width: 160,
+      height: 90,
+      style: {
+        fill: 'rgba(217, 70, 239, 0.85)',
+        stroke: '#f0abfc',
+        strokeWidth: 2,
+        textColor: '#ffffff',
+        rounded: 9999,
+      },
+      data: { level: 1, shape: 'oval' },
+      documentation: {
+        description: 'Oval mind map node for highlighting key concepts and branching themes.',
+        tags: ['Mindmap', 'Oval', 'Topic'],
+        status: 'draft',
+      },
+    },
+  },
 
   // 13. Value Stream Mapping (VSM)
   {
