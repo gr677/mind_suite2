@@ -31,6 +31,9 @@ import {
   ArrowLeft,
   Lock,
   FolderTree,
+  Brain,
+  MoreHorizontal,
+  Wrench,
 } from 'lucide-react';
 import { THEMES } from '../../utils/themeConfig';
 import { workspaceService } from '../../services/workspaceService';
@@ -43,7 +46,7 @@ interface AppHeaderProps {
   isOnline: boolean;
   queuedCount: number;
   theme: AppTheme;
-  saveStatus?: 'idle' | 'saving' | 'saved';
+  saveStatus?: 'idle' | 'saving' | 'saved' | 'unsaved';
   activeWorkspaceName?: string;
   activeDiagramFilename?: string;
   navigationHistory?: Array<{ filename: string; diagramName: string; pageId?: string; nodeLabel?: string }>;
@@ -90,20 +93,12 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
   onToggleTheme,
   onSwitchDiagram,
 }) => {
-  const [isPageDropdownOpen, setIsPageDropdownOpen] = useState(false);
-  const [isRoleDropdownOpen, setIsRoleDropdownOpen] = useState(false);
+  const [isToolsDropdownOpen, setIsToolsDropdownOpen] = useState(false);
+  const [isRoleSubmenuOpen, setIsRoleSubmenuOpen] = useState(false);
   const [isDiagramDropdownOpen, setIsDiagramDropdownOpen] = useState(false);
 
   const themeDef = THEMES[theme] || THEMES.dark;
   const isDark = themeDef.isDark;
-
-  // Compute breadcrumb trail
-  const breadcrumbs: { id: string; title: string }[] = [];
-  let curr: DiagramPage | undefined = currentPage;
-  while (curr) {
-    breadcrumbs.unshift({ id: curr.id, title: curr.title });
-    curr = curr.parentId ? document.pages.find(p => p.id === curr?.parentId) : undefined;
-  }
 
   const roleColors: Record<UserRole, string> = {
     admin: 'bg-rose-500/20 text-rose-300 border-rose-500/40',
@@ -114,42 +109,32 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
 
   return (
     <header className={`h-14 border-b flex items-center justify-between px-4 select-none z-30 shrink-0 transition-colors duration-150 ${themeDef.headerClass}`}>
-      {/* Left: Brand, Diagram Types Gallery & Breadcrumbs Navigation */}
+      {/* Left: Brand & Navigation */}
       <div className="flex items-center gap-3 min-w-0">
-        {/* App Logo */}
-        <div className={`flex items-center gap-2 pr-3 border-r shrink-0 ${isDark ? 'border-slate-800' : 'border-slate-200'}`}>
-          <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-blue-600 via-indigo-500 to-purple-500 flex items-center justify-center shadow-lg shadow-blue-500/20 text-white font-black text-sm">
-            OM
+        {/* App Logo: Brain Icon & Title */}
+        <div className={`flex items-center gap-2.5 pr-3 border-r shrink-0 ${isDark ? 'border-slate-800' : 'border-slate-200'}`}>
+          <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-blue-600 via-indigo-500 to-purple-500 flex items-center justify-center shadow-lg shadow-blue-500/25 text-white">
+            <Brain className="w-5 h-5 text-white" />
           </div>
-          <div className="hidden xl:block">
+          <div>
             <h1 className={`text-xs font-bold tracking-wide uppercase ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>OmniModel Studio</h1>
-            <p className={`text-[10px] font-mono ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Enterprise Architecture Suite</p>
+            <p className={`text-[9px] font-mono ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Enterprise Architecture Suite</p>
           </div>
         </div>
 
-        {/* Big Diagram Types Catalog Launcher Button */}
-        <button
-          onClick={onOpenGallery}
-          className="flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white rounded-lg text-xs font-bold cursor-pointer transition-all shadow-md shadow-blue-600/20 shrink-0"
-          title="Open complete catalog of 19 standardized diagram types"
-        >
-          <Layers className="w-3.5 h-3.5" />
-          <span>Diagram Types (19)</span>
-        </button>
-
-        {/* Back to Parent Diagram Button (Change 4) */}
-        {navigationHistory.length > 0 && (
+        {/* Back to Parent Diagram Button (Shown when in a child diagram) */}
+        {navigationHistory.length > 0 && onNavigateBack && (
           <button
             onClick={onNavigateBack}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold shadow-md shadow-purple-600/30 cursor-pointer transition-all shrink-0 animate-in fade-in"
             title={`Return to parent diagram: ${navigationHistory[navigationHistory.length - 1].diagramName || navigationHistory[navigationHistory.length - 1].filename}`}
           >
             <ArrowLeft className="w-3.5 h-3.5" />
-            <span>Back to {navigationHistory[navigationHistory.length - 1].nodeLabel ? `Node "${navigationHistory[navigationHistory.length - 1].nodeLabel}"` : 'Parent Diagram'}</span>
+            <span>Back to {navigationHistory[navigationHistory.length - 1].nodeLabel ? `Node "${navigationHistory[navigationHistory.length - 1].nodeLabel}"` : 'Parent'}</span>
           </button>
         )}
 
-        {/* Workspace Storage Path Pill (C:\omnimind\<workspace>\data\root.json) */}
+        {/* Workspace Storage Path Pill (C:\omnimind\<workspace>\data\<filename>) */}
         <button
           onClick={onOpenWorkspaceModal}
           className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs font-mono transition-all cursor-pointer shadow-sm group shrink-0 ${
@@ -243,274 +228,198 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
           )}
         </div>
 
-        {/* Save Diagram Button */}
+        {/* Manual Save Diagram Button with Unsaved Changes Indicator */}
         <button
           onClick={onManualSave}
-          className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold cursor-pointer transition-all shadow-xs shrink-0 ${
-            saveStatus === 'saved'
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition-all shadow-md shrink-0 ${
+            saveStatus === 'unsaved'
+              ? 'bg-amber-600 hover:bg-amber-500 text-white ring-2 ring-amber-400/40 shadow-amber-600/30 animate-pulse'
+              : saveStatus === 'saved'
               ? 'bg-emerald-600 text-white shadow-emerald-500/20'
+              : saveStatus === 'saving'
+              ? 'bg-blue-600 text-white opacity-80'
               : 'bg-blue-600 hover:bg-blue-500 text-white'
           }`}
-          title={`Save active diagram to ${activeWorkspaceName || 'workspace1'} (Ctrl+S)`}
+          title={`Save active diagram '${activeDiagramFilename || 'root.json'}' to C:\\omnimind\\${activeWorkspaceName || 'workspace1'}\\data\\${activeDiagramFilename || 'root.json'} (Ctrl+S)`}
         >
-          {saveStatus === 'saved' ? <Check className="w-3.5 h-3.5" /> : <Save className="w-3.5 h-3.5" />}
-          <span>{saveStatus === 'saved' ? 'Saved!' : 'Save'}</span>
+          {saveStatus === 'saved' ? (
+            <Check className="w-3.5 h-3.5" />
+          ) : (
+            <Save className="w-3.5 h-3.5" />
+          )}
+          <span>
+            {saveStatus === 'saved'
+              ? 'Saved!'
+              : saveStatus === 'saving'
+              ? 'Saving...'
+              : saveStatus === 'unsaved'
+              ? 'Save Changes *'
+              : 'Save'}
+          </span>
           <kbd className="hidden lg:inline text-[9px] font-mono px-1 py-0.2 rounded bg-black/25 opacity-80">
             Ctrl+S
           </kbd>
         </button>
-
-        {/* Current Diagram Type Badge (Locked - Set on creation) */}
-        <div
-          className={`hidden md:flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-[11px] font-mono shrink-0 select-none ${
-            isDark
-              ? 'bg-slate-900/90 border-slate-800 text-sky-300'
-              : 'bg-slate-100 border-slate-200 text-sky-700'
-          }`}
-          title={`Diagram format: ${currentPage.diagramType.toUpperCase()} (Locked at creation). You can drag & drop objects from any diagram type using the Shape Library.`}
-        >
-          <Lock className="w-3 h-3 text-amber-400" />
-          <span className="uppercase font-bold">{currentPage.diagramType}</span>
-          <span className="text-[9px] px-1 py-0.2 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30 font-semibold">
-            Locked
-          </span>
-        </div>
-
-        {/* Dynamic Breadcrumbs */}
-        <nav className="flex items-center gap-1.5 text-xs truncate">
-          <button
-            onClick={() => onSelectPage(document.pages[0].id)}
-            className={`font-medium cursor-pointer ${isDark ? 'text-slate-400 hover:text-slate-200' : 'text-slate-500 hover:text-slate-800'}`}
-          >
-            Pages
-          </button>
-          <ChevronRight className={`w-3.5 h-3.5 shrink-0 ${isDark ? 'text-slate-600' : 'text-slate-400'}`} />
-
-          {breadcrumbs.map((crumb, idx) => {
-            const isLast = idx === breadcrumbs.length - 1;
-            return (
-              <React.Fragment key={crumb.id}>
-                {idx > 0 && <ChevronRight className={`w-3.5 h-3.5 shrink-0 ${isDark ? 'text-slate-600' : 'text-slate-400'}`} />}
-                {isLast ? (
-                  <div className="relative">
-                    <button
-                      onClick={() => setIsPageDropdownOpen(o => !o)}
-                      className={`flex items-center gap-1 px-2 py-1 rounded-md border font-semibold cursor-pointer max-w-[200px] truncate ${
-                        isDark
-                          ? 'bg-slate-900 border-slate-800 hover:border-slate-700 text-blue-400'
-                          : 'bg-slate-100 border-slate-200 hover:border-slate-300 text-blue-600'
-                      }`}
-                    >
-                      <span className="truncate">{crumb.title}</span>
-                      <ChevronDown className={`w-3 h-3 shrink-0 ${isDark ? 'text-slate-400' : 'text-slate-500'}`} />
-                    </button>
-
-                    {/* Page Switcher Dropdown */}
-                    {isPageDropdownOpen && (
-                      <div className={`absolute left-0 mt-1 w-72 border rounded-xl shadow-2xl p-1.5 z-50 ${
-                        isDark ? 'bg-slate-900 border-slate-800 text-slate-200' : 'bg-white border-slate-200 text-slate-800'
-                      }`}>
-                        <div className={`px-2 py-1 text-[10px] uppercase font-mono border-b mb-1 flex items-center justify-between ${
-                          isDark ? 'text-slate-400 border-slate-800' : 'text-slate-500 border-slate-100'
-                        }`}>
-                          <span>Switch Diagram Page</span>
-                          <span className={isDark ? 'text-slate-500' : 'text-slate-400'}>{document.pages.length} total</span>
-                        </div>
-                        <div className="max-h-64 overflow-y-auto space-y-0.5">
-                          {document.pages.map(page => (
-                            <button
-                              key={page.id}
-                              onClick={() => {
-                                onSelectPage(page.id);
-                                setIsPageDropdownOpen(false);
-                              }}
-                              className={`w-full text-left px-2 py-1.5 rounded-lg text-xs flex items-center justify-between cursor-pointer transition-colors ${
-                                page.id === currentPage.id
-                                  ? 'bg-blue-600 text-white font-medium'
-                                  : isDark
-                                  ? 'hover:bg-slate-800 text-slate-300'
-                                  : 'hover:bg-slate-100 text-slate-700'
-                              }`}
-                            >
-                              <span className="truncate">{page.title}</span>
-                              <span className={`text-[9px] font-mono opacity-70 uppercase ml-2 px-1 py-0.2 rounded border ${
-                                isDark ? 'bg-slate-950/60 border-slate-800' : 'bg-slate-100 border-slate-200 text-slate-600'
-                              }`}>
-                                {page.diagramType}
-                              </span>
-                            </button>
-                          ))}
-                        </div>
-                        <div className={`pt-1.5 border-t mt-1 space-y-1 ${isDark ? 'border-slate-800' : 'border-slate-100'}`}>
-                          <button
-                            onClick={() => {
-                              setIsPageDropdownOpen(false);
-                              onOpenNewPageModal();
-                            }}
-                            className={`w-full py-1 px-2 text-center text-xs text-blue-500 rounded font-medium cursor-pointer ${
-                              isDark ? 'hover:bg-slate-800' : 'hover:bg-slate-100'
-                            }`}
-                          >
-                            + Create New Diagram Page
-                          </button>
-                          <button
-                            onClick={() => {
-                              setIsPageDropdownOpen(false);
-                              onOpenGallery();
-                            }}
-                            className={`w-full py-1 px-2 text-center text-xs rounded font-medium cursor-pointer ${
-                              isDark ? 'text-slate-400 hover:text-slate-200 hover:bg-slate-800' : 'text-slate-500 hover:text-slate-800 hover:bg-slate-100'
-                            }`}
-                          >
-                            Browse All 19 Diagram Types &amp; Templates...
-                          </button>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  <button
-                    onClick={() => onSelectPage(crumb.id)}
-                    className={`cursor-pointer truncate max-w-[140px] ${
-                      isDark ? 'text-slate-400 hover:text-slate-200' : 'text-slate-500 hover:text-slate-800'
-                    }`}
-                  >
-                    {crumb.title}
-                  </button>
-                )}
-              </React.Fragment>
-            );
-          })}
-        </nav>
-
-        {/* Add Page Button */}
-        <button
-          onClick={onOpenNewPageModal}
-          className={`p-1 rounded cursor-pointer transition-colors ${
-            isDark ? 'hover:bg-slate-800 text-slate-400 hover:text-slate-200' : 'hover:bg-slate-100 text-slate-500 hover:text-slate-800'
-          }`}
-          title="Add Diagram Page"
-        >
-          <Plus className="w-4 h-4" />
-        </button>
       </div>
 
-      {/* Right: Actions, RBAC Role Switcher, Collaborators & Modals */}
-      <div className="flex items-center gap-2.5">
-        {/* RBAC Role Switcher */}
+      {/* Right: Gallery, Tools Menu, Settings & Theme */}
+      <div className="flex items-center gap-2">
+        {/* Diagram Types Catalog Launcher */}
+        <button
+          onClick={onOpenGallery}
+          className="flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white rounded-lg text-xs font-bold cursor-pointer transition-all shadow-md shadow-blue-600/20 shrink-0"
+          title="Open complete catalog of 19 standardized diagram types"
+        >
+          <Layers className="w-3.5 h-3.5" />
+          <span>Diagram Types (19)</span>
+        </button>
+
+        {/* Consolidated Tools & Extensions Dropdown */}
         <div className="relative">
           <button
-            onClick={() => setIsRoleDropdownOpen(r => !r)}
-            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-xs font-semibold cursor-pointer transition-colors ${roleColors[userRole]}`}
-            title="Switch User Role (RBAC)"
+            type="button"
+            onClick={() => setIsToolsDropdownOpen(v => !v)}
+            className={`flex items-center gap-1.5 px-2.5 py-1.5 border rounded-lg text-xs font-medium cursor-pointer transition-colors shadow-xs ${
+              isToolsDropdownOpen
+                ? 'bg-slate-800 border-blue-500 text-white'
+                : isDark
+                ? 'bg-slate-900 hover:bg-slate-800 border-slate-800 text-slate-200'
+                : 'bg-slate-100 hover:bg-slate-200 border-slate-200 text-slate-700'
+            }`}
+            title="Tools, Version History, GitHub, Offline Sync & RBAC"
           >
-            <Shield className="w-3.5 h-3.5" />
-            <span className="capitalize">{userRole}</span>
-            <ChevronDown className="w-3 h-3 opacity-70" />
+            <Wrench className="w-3.5 h-3.5 text-blue-400" />
+            <span className="hidden sm:inline">Tools</span>
+            <ChevronDown className={`w-3 h-3 text-slate-400 transition-transform ${isToolsDropdownOpen ? 'rotate-180' : ''}`} />
           </button>
 
-          {isRoleDropdownOpen && (
-            <div className={`absolute right-0 mt-1 w-52 border rounded-xl shadow-2xl p-1.5 z-50 text-xs ${
-              isDark ? 'bg-slate-900 border-slate-800 text-slate-200' : 'bg-white border-slate-200 text-slate-800'
-            }`}>
-              <div className={`px-2 py-1 text-[10px] uppercase font-mono border-b mb-1 ${
-                isDark ? 'text-slate-400 border-slate-800' : 'text-slate-500 border-slate-100'
+          {isToolsDropdownOpen && (
+            <div
+              className={`absolute right-0 mt-1.5 w-64 border rounded-xl shadow-2xl p-1.5 z-50 text-xs backdrop-blur-md animate-in fade-in slide-in-from-top-2 ${
+                isDark ? 'bg-slate-900/95 border-slate-700 text-slate-200' : 'bg-white/95 border-slate-200 text-slate-800'
+              }`}
+              onMouseLeave={() => {
+                setIsToolsDropdownOpen(false);
+                setIsRoleSubmenuOpen(false);
+              }}
+            >
+              <div className={`px-2.5 py-1 text-[10px] uppercase font-mono border-b mb-1 flex items-center justify-between ${
+                isDark ? 'text-slate-400 border-slate-800' : 'text-slate-500 border-slate-200'
               }`}>
-                Select RBAC Role
+                <span>Tools &amp; Integration</span>
+                <span className="font-bold text-blue-400">OmniMind</span>
               </div>
-              {(['admin', 'editor', 'reviewer', 'viewer'] as const).map(role => (
-                <button
-                  key={role}
-                  onClick={() => {
-                    onChangeRole(role);
-                    setIsRoleDropdownOpen(false);
-                  }}
-                  className={`w-full text-left px-2 py-1.5 rounded-lg capitalize flex items-center justify-between cursor-pointer ${
-                    userRole === role
-                      ? 'bg-blue-600 text-white font-medium'
-                      : isDark
-                      ? 'hover:bg-slate-800 text-slate-300'
-                      : 'hover:bg-slate-100 text-slate-700'
-                  }`}
-                >
-                  <span>{role}</span>
-                  <span className={`text-[10px] lowercase font-mono ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
-                    {role === 'admin' ? 'full rights' : role === 'editor' ? 'can edit' : role === 'reviewer' ? 'comments only' : 'read-only'}
-                  </span>
-                </button>
-              ))}
+
+              {/* Version History */}
+              <button
+                type="button"
+                onClick={() => {
+                  setIsToolsDropdownOpen(false);
+                  onOpenVersionsModal();
+                }}
+                className={`w-full text-left px-2.5 py-2 rounded-lg flex items-center justify-between transition-colors cursor-pointer ${
+                  isDark ? 'hover:bg-slate-800 text-slate-200' : 'hover:bg-slate-100 text-slate-800'
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <History className="w-3.5 h-3.5 text-blue-400" />
+                  <span>Version Snapshots</span>
+                </div>
+                <span className="text-[10px] font-mono text-slate-400">{document.versions.length} commits</span>
+              </button>
+
+              {/* REST API & JSON Data Explorer */}
+              <button
+                type="button"
+                onClick={() => {
+                  setIsToolsDropdownOpen(false);
+                  onOpenRestApiModal();
+                }}
+                className={`w-full text-left px-2.5 py-2 rounded-lg flex items-center justify-between transition-colors cursor-pointer ${
+                  isDark ? 'hover:bg-slate-800 text-slate-200' : 'hover:bg-slate-100 text-slate-800'
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <Server className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>REST API &amp; JSON Hub</span>
+                </div>
+                <span className="text-[9px] font-mono px-1.5 py-0.2 bg-emerald-500/10 text-emerald-400 rounded">REST</span>
+              </button>
+
+              {/* GitHub Publish */}
+              <button
+                type="button"
+                onClick={() => {
+                  setIsToolsDropdownOpen(false);
+                  onOpenGitHubModal();
+                }}
+                className={`w-full text-left px-2.5 py-2 rounded-lg flex items-center justify-between transition-colors cursor-pointer ${
+                  isDark ? 'hover:bg-slate-800 text-slate-200' : 'hover:bg-slate-100 text-slate-800'
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <Github className="w-3.5 h-3.5 text-slate-300" />
+                  <span>GitHub Sync &amp; Push</span>
+                </div>
+                <span className="text-[9px] font-mono opacity-60">git</span>
+              </button>
+
+              {/* Offline Sync Status */}
+              <button
+                type="button"
+                onClick={() => {
+                  setIsToolsDropdownOpen(false);
+                  onOpenOfflineModal();
+                }}
+                className={`w-full text-left px-2.5 py-2 rounded-lg flex items-center justify-between transition-colors cursor-pointer ${
+                  isDark ? 'hover:bg-slate-800 text-slate-200' : 'hover:bg-slate-100 text-slate-800'
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  {isOnline ? <Wifi className="w-3.5 h-3.5 text-emerald-400" /> : <WifiOff className="w-3.5 h-3.5 text-rose-400" />}
+                  <span>Offline Sync Status</span>
+                </div>
+                <span className={`text-[10px] font-mono ${isOnline ? 'text-emerald-400' : 'text-rose-400'}`}>
+                  {isOnline ? 'Online' : 'Offline'}
+                </span>
+              </button>
+
+              {/* RBAC Role Switcher submenu */}
+              <div className={`pt-1 mt-1 border-t ${isDark ? 'border-slate-800' : 'border-slate-200'}`}>
+                <div className="px-2.5 py-1 text-[10px] font-mono uppercase text-slate-400 flex items-center justify-between">
+                  <span>User Role (RBAC)</span>
+                  <span className={`px-1.5 py-0.2 rounded font-bold capitalize ${roleColors[userRole]}`}>{userRole}</span>
+                </div>
+                <div className="grid grid-cols-2 gap-1 px-1 py-1">
+                  {(['admin', 'editor', 'reviewer', 'viewer'] as const).map(role => (
+                    <button
+                      key={role}
+                      type="button"
+                      onClick={() => {
+                        onChangeRole(role);
+                        setIsToolsDropdownOpen(false);
+                      }}
+                      className={`px-2 py-1 rounded text-left capitalize transition-colors text-[11px] cursor-pointer ${
+                        userRole === role
+                          ? 'bg-blue-600 text-white font-bold'
+                          : isDark
+                          ? 'hover:bg-slate-800 text-slate-300'
+                          : 'hover:bg-slate-100 text-slate-700'
+                      }`}
+                    >
+                      {role}
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
           )}
         </div>
 
-        {/* Offline Sync Status Pill */}
-        <button
-          onClick={onOpenOfflineModal}
-          className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold cursor-pointer border transition-colors ${
-            !isOnline
-              ? 'bg-rose-500/20 text-rose-300 border-rose-500/40 animate-pulse'
-              : queuedCount > 0
-              ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
-              : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
-          }`}
-          title="Inspect Offline Sync & Local Queue"
-        >
-          {isOnline ? <Wifi className="w-3.5 h-3.5" /> : <WifiOff className="w-3.5 h-3.5" />}
-          <span className="hidden md:inline">
-            {!isOnline
-              ? `Offline (${queuedCount} queued)`
-              : queuedCount > 0
-              ? `Syncing (${queuedCount})`
-              : 'Online'}
-          </span>
-        </button>
-
-        {/* GitHub Publish Button */}
-        <button
-          onClick={onOpenGitHubModal}
-          className={`flex items-center gap-1.5 px-2.5 py-1 border rounded-lg text-xs font-medium cursor-pointer transition-colors shadow-xs ${
-            isDark
-              ? 'bg-slate-900 hover:bg-slate-800 border-slate-800 text-slate-200'
-              : 'bg-slate-100 hover:bg-slate-200 border-slate-200 text-slate-700'
-          }`}
-          title="Publish project to GitHub repository"
-        >
-          <Github className={`w-3.5 h-3.5 ${isDark ? 'text-slate-200' : 'text-slate-700'}`} />
-          <span className="hidden lg:inline">GitHub</span>
-        </button>
-
-        {/* REST API & JSON Hub Button */}
-        <button
-          onClick={onOpenRestApiModal}
-          className={`flex items-center gap-1.5 px-2.5 py-1 border rounded-lg text-xs font-medium cursor-pointer transition-colors shadow-xs ${
-            isDark
-              ? 'bg-slate-900 hover:bg-slate-800 border-slate-800 text-slate-200'
-              : 'bg-slate-100 hover:bg-slate-200 border-slate-200 text-slate-700'
-          }`}
-          title="Open REST API & JSON Data Explorer"
-        >
-          <Server className="w-3.5 h-3.5 text-emerald-500" />
-          <span className="hidden lg:inline">REST API &amp; JSON</span>
-        </button>
-
-        {/* Version History Button */}
-        <button
-          onClick={onOpenVersionsModal}
-          className={`flex items-center gap-1.5 px-2.5 py-1 border rounded-lg text-xs font-medium cursor-pointer transition-colors shadow-xs ${
-            isDark
-              ? 'bg-slate-900 hover:bg-slate-800 border-slate-800 text-slate-200'
-              : 'bg-slate-100 hover:bg-slate-200 border-slate-200 text-slate-700'
-          }`}
-          title="Version History Snapshots"
-        >
-          <History className="w-3.5 h-3.5 text-blue-500" />
-          <span className="hidden lg:inline">History ({document.versions.length})</span>
-        </button>
-
-        {/* Settings Menu Button */}
+        {/* Studio Settings */}
         <button
           onClick={onOpenSettingsModal}
-          className={`flex items-center gap-1.5 px-2.5 py-1 border rounded-lg text-xs font-medium cursor-pointer transition-colors shadow-xs ${
+          className={`flex items-center gap-1.5 px-2.5 py-1.5 border rounded-lg text-xs font-medium cursor-pointer transition-colors shadow-xs ${
             isDark
               ? 'bg-slate-900 hover:bg-slate-800 border-slate-800 text-slate-200'
               : 'bg-slate-100 hover:bg-slate-200 border-slate-200 text-slate-700'

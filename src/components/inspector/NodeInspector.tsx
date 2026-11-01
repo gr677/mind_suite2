@@ -383,11 +383,21 @@ export const NodeInspector: React.FC<NodeInspectorProps> = ({
     // Show Page Overview Inspector
     return (
       <div className={`w-80 h-full border-l flex flex-col select-none transition-colors duration-150 ${themeDef.sidebarClass}`}>
-        <div className="p-3.5 border-b border-slate-800 flex items-center justify-between">
+        <div className={`p-3.5 border-b flex items-center justify-between ${themeDef.isDark ? 'border-slate-800' : 'border-slate-200'}`}>
           <div className="flex items-center gap-2">
             <Layers className="w-4 h-4 text-blue-400" />
-            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-100">Page Architecture</h3>
+            <h3 className={`text-xs font-bold uppercase tracking-wider ${themeDef.isDark ? 'text-slate-100' : 'text-slate-900'}`}>Page Architecture</h3>
           </div>
+          <button
+            onClick={onClose}
+            className={`p-1.5 rounded cursor-pointer transition-colors ${
+              themeDef.isDark ? 'hover:bg-slate-800 text-slate-400 hover:text-slate-200' : 'hover:bg-slate-100 text-slate-500 hover:text-slate-800'
+            }`}
+            title="Close Inspector"
+            aria-label="Close properties panel"
+          >
+            <X className="w-4 h-4" />
+          </button>
         </div>
         <div className="p-4 space-y-4 flex-1 overflow-y-auto text-xs">
           <div>
@@ -491,14 +501,18 @@ export const NodeInspector: React.FC<NodeInspectorProps> = ({
   return (
     <div className={`w-80 h-full border-l flex flex-col select-none transition-colors duration-150 ${themeDef.sidebarClass}`}>
       {/* Inspector Header */}
-      <div className="p-3 border-b border-slate-800 flex items-center justify-between">
+      <div className={`p-3 border-b flex items-center justify-between ${themeDef.isDark ? 'border-slate-800' : 'border-slate-200'}`}>
         <div className="flex items-center gap-2 truncate">
           <div className="w-2.5 h-2.5 rounded-full bg-blue-500" />
-          <span className="text-xs font-bold text-slate-100 truncate">{selectedNode.label}</span>
+          <span className={`text-xs font-bold truncate ${themeDef.isDark ? 'text-slate-100' : 'text-slate-900'}`}>{selectedNode.label}</span>
         </div>
         <button
           onClick={onClose}
-          className="p-1 hover:bg-slate-800 text-slate-400 hover:text-slate-200 rounded cursor-pointer"
+          className={`p-1.5 rounded cursor-pointer transition-colors ${
+            themeDef.isDark ? 'hover:bg-slate-800 text-slate-400 hover:text-slate-200' : 'hover:bg-slate-100 text-slate-500 hover:text-slate-800'
+          }`}
+          title="Close Inspector"
+          aria-label="Close properties panel"
         >
           <X className="w-4 h-4" />
         </button>

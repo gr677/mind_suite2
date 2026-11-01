@@ -75,7 +75,7 @@ export default function App() {
   const [isWorkspaceModalOpen, setIsWorkspaceModalOpen] = useState(false);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   const [isSaveSuccessModalOpen, setIsSaveSuccessModalOpen] = useState(false);
-  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'unsaved'>('idle');
   const [activeWs, setActiveWs] = useState(() => workspaceService.getActiveWorkspace());
   const [childModalNode, setChildModalNode] = useState<DiagramNode | null>(null);
   const [navigationHistory, setNavigationHistory] = useState<
@@ -217,30 +217,13 @@ export default function App() {
     loadRemoteDoc();
   }, []);
 
-  // Save document state locally and sync remotely
+  // Save document state in memory and mark unsaved (manual save writes to server disk)
   const persistDocument = useCallback((updatedDoc: DiagramDocument) => {
     setDocument(updatedDoc);
+    setSaveStatus('unsaved');
     offlineSyncService.cacheDocument(updatedDoc);
-    workspaceService.saveCurrentDiagram(updatedDoc);
-
-    if (offlineSyncService.isOnline()) {
-      fetch(`/api/diagrams/${updatedDoc.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(updatedDoc),
-      }).catch(err => {
-        console.warn('Network write failed, enqueuing mutation:', err);
-        offlineSyncService.enqueueMutation('UPDATE_PAGE', {
-          pageId: updatedDoc.activePageId,
-          data: updatedDoc.pages.find(p => p.id === updatedDoc.activePageId),
-        });
-      });
-    } else {
-      offlineSyncService.enqueueMutation('UPDATE_PAGE', {
-        pageId: updatedDoc.activePageId,
-        data: updatedDoc.pages.find(p => p.id === updatedDoc.activePageId),
-      });
-    }
+    const ws = workspaceService.getActiveWorkspace();
+    workspaceService.saveCurrentDiagram(updatedDoc, ws.activeDiagramFilename);
   }, []);
 
   // Update nodes for current page
@@ -779,6 +762,7 @@ export default function App() {
       setActiveWs({ ...workspaceService.getActiveWorkspace() });
       setDocument(targetDoc);
       offlineSyncService.cacheDocument(targetDoc);
+      setSaveStatus('idle');
       if (targetDoc.pages && targetDoc.pages.length > 0) {
         setActivePageId(targetDoc.activePageId || targetDoc.pages[0].id);
       }
@@ -795,6 +779,7 @@ export default function App() {
     (doc: DiagramDocument) => {
       setDocument(doc);
       offlineSyncService.cacheDocument(doc);
+      setSaveStatus('idle');
       if (doc.pages && doc.pages.length > 0) {
         setActivePageId(doc.activePageId || doc.pages[0].id);
       }
@@ -815,25 +800,26 @@ export default function App() {
 
   const handleManualSave = useCallback(async () => {
     setSaveStatus('saving');
-    persistDocument(document);
-    workspaceService.saveCurrentDiagram(document);
+    const ws = workspaceService.getActiveWorkspace();
+    const filename = ws.activeDiagramFilename || 'root.json';
+    workspaceService.saveCurrentDiagram(document, filename);
     // Persist synchronously to server disk so save modal reflects latest disk write
-    const result = await workspaceService.saveCurrentDiagramToServer(document);
+    const result = await workspaceService.saveCurrentDiagramToServer(document, filename);
     if (!result.success) {
       console.error('[OmniMind App] Save diagram failed:', result.error, result.details);
-      setSaveStatus('idle');
+      setSaveStatus('unsaved');
       setIsSaveSuccessModalOpen(true);
       return;
     }
     collaborationService.addActivity(
       'You',
       '#10b981',
-      `Saved diagram to ${activeWs.name}/${activeWs.activeDiagramFilename}`
+      `Saved diagram to ${ws.name}/${filename}`
     );
     setSaveStatus('saved');
     setIsSaveSuccessModalOpen(true);
     setTimeout(() => setSaveStatus('idle'), 2500);
-  }, [document, persistDocument, activeWs]);
+  }, [document]);
 
   const handleToggleTheme = useCallback(() => {
     const themeKeys: AppTheme[] = [
@@ -929,6 +915,8 @@ export default function App() {
 
         {/* Center: Infinite Interactive Diagram Canvas */}
         <DiagramCanvas
+          pageId={currentPage.id}
+          activeDiagramFilename={activeWs.activeDiagramFilename || 'root.json'}
           nodes={currentPage.nodes}
           edges={currentPage.edges}
           collaborators={collaborators}

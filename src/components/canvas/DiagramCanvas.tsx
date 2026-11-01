@@ -36,6 +36,7 @@ import { ContextMenu, ContextMenuPosition } from './ContextMenu';
 import { NodeContentEditModal } from '../modals/NodeContentEditModal';
 import { THEMES } from '../../utils/themeConfig';
 import { getDefaultConnectorStyleForDiagram } from '../../utils/diagramConnectorConfig';
+import { PageTearTransition } from './PageTearTransition';
 
 interface DiagramCanvasProps {
   nodes: DiagramNode[];
@@ -47,6 +48,8 @@ interface DiagramCanvasProps {
   theme: AppTheme;
   diagramType?: DiagramType;
   settings?: StudioSettings;
+  pageId?: string;
+  activeDiagramFilename?: string;
   onSelectNode: (nodeId: string | null) => void;
   onSelectEdge: (edgeId: string | null) => void;
   onUpdateNodes: (nodes: DiagramNode[]) => void;
@@ -74,6 +77,8 @@ export const DiagramCanvas: React.FC<DiagramCanvasProps> = ({
   theme,
   diagramType = 'generic',
   settings,
+  pageId,
+  activeDiagramFilename,
   onSelectNode,
   onSelectEdge,
   onUpdateNodes,
@@ -1163,6 +1168,12 @@ export const DiagramCanvas: React.FC<DiagramCanvasProps> = ({
         onSaveNode={updated => {
           onUpdateNodes(nodes.map(n => (n.id === updated.id ? updated : n)));
         }}
+      />
+
+      {/* Mac-style Page Tearing Transition Effect */}
+      <PageTearTransition
+        transitionKey={`${activeDiagramFilename || 'root.json'}_${pageId || 'main'}`}
+        isDark={themeDef.isDark}
       />
     </div>
   );

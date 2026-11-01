@@ -607,16 +607,6 @@ class WorkspaceService {
       document: doc,
     };
     this.saveStore();
-
-    // Debounce server disk write by 1500ms to avoid overwhelming disk on rapid canvas edits
-    if (this.serverSaveDebounceTimer) {
-      clearTimeout(this.serverSaveDebounceTimer);
-    }
-    this.serverSaveDebounceTimer = setTimeout(() => {
-      this.saveCurrentDiagramToServer(doc, filename).catch(err => {
-        console.warn('[WorkspaceService] Background save to server notice:', err);
-      });
-    }, 1500);
   }
 
   public updateLocalDiagramCache(filename: string, doc: DiagramDocument): void {
@@ -788,9 +778,6 @@ class WorkspaceService {
       document: newDoc,
     };
     this.saveStore();
-
-    // Persist to server disk
-    this.saveCurrentDiagramToServer(newDoc, safeFilename).catch(() => {});
 
     return newDoc;
   }
