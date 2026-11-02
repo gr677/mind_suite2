@@ -5,6 +5,7 @@
 
 import React from 'react';
 import { DiagramEdge, DiagramNode } from '../../types/diagram';
+import { getNodeAnchorCoords, isAnchorHorizontal } from '../../utils/diagramAnchors';
 
 interface EdgeRendererProps {
   edge: DiagramEdge;
@@ -27,24 +28,8 @@ export const EdgeRenderer: React.FC<EdgeRendererProps> = ({
 }) => {
   if (!sourceNode || !targetNode) return null;
 
-  // Calculate coordinates for source anchor
-  const getAnchorCoords = (node: DiagramNode, anchor: 'top' | 'right' | 'bottom' | 'left') => {
-    switch (anchor) {
-      case 'top':
-        return { x: node.x + node.width / 2, y: node.y };
-      case 'right':
-        return { x: node.x + node.width, y: node.y + node.height / 2 };
-      case 'bottom':
-        return { x: node.x + node.width / 2, y: node.y + node.height };
-      case 'left':
-        return { x: node.x, y: node.y + node.height / 2 };
-      default:
-        return { x: node.x + node.width / 2, y: node.y + node.height / 2 };
-    }
-  };
-
-  const start = getAnchorCoords(sourceNode, edge.sourceAnchor);
-  const end = getAnchorCoords(targetNode, edge.targetAnchor);
+  const start = getNodeAnchorCoords(sourceNode, edge.sourceAnchor);
+  const end = getNodeAnchorCoords(targetNode, edge.targetAnchor);
 
   // Generate SVG path string based on edge type
   let pathD = '';
@@ -60,8 +45,7 @@ export const EdgeRenderer: React.FC<EdgeRendererProps> = ({
     const dx = end.x - start.x;
     const dy = end.y - start.y;
     const isHorizontal =
-      edge.sourceAnchor === 'right' ||
-      edge.sourceAnchor === 'left' ||
+      isAnchorHorizontal(edge.sourceAnchor) ||
       Math.abs(dx) > Math.abs(dy);
 
     if (isHorizontal) {
@@ -79,7 +63,7 @@ export const EdgeRenderer: React.FC<EdgeRendererProps> = ({
     }
   } else {
     // Orthogonal / Stepped path with 90° corners (standard for ERD, BPMN, Architecture)
-    if (edge.sourceAnchor === 'right' || edge.sourceAnchor === 'left') {
+    if (isAnchorHorizontal(edge.sourceAnchor)) {
       midX = start.x + (end.x - start.x) / 2;
       pathD = `M ${start.x} ${start.y} L ${midX} ${start.y} L ${midX} ${end.y} L ${end.x} ${end.y}`;
       midY = (start.y + end.y) / 2;

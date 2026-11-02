@@ -126,12 +126,27 @@ export interface DiagramNode {
   comments?: Comment[];
 }
 
+export type NodeAnchor =
+  | 'top-left'
+  | 'top'
+  | 'top-right'
+  | 'right-top'
+  | 'right'
+  | 'right-bottom'
+  | 'bottom-right'
+  | 'bottom'
+  | 'bottom-left'
+  | 'left-bottom'
+  | 'left'
+  | 'left-top'
+  | string;
+
 export interface DiagramEdge {
   id: string;
   sourceNodeId: string;
   targetNodeId: string;
-  sourceAnchor: 'top' | 'right' | 'bottom' | 'left';
-  targetAnchor: 'top' | 'right' | 'bottom' | 'left';
+  sourceAnchor: NodeAnchor;
+  targetAnchor: NodeAnchor;
   label?: string;
   type: 'straight' | 'orthogonal' | 'curved';
   lineStyle: 'solid' | 'dashed' | 'dotted';

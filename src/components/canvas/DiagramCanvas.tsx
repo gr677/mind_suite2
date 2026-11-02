@@ -29,6 +29,12 @@ import { ContextMenu, ContextMenuPosition } from './ContextMenu';
 import { NodeContentEditModal } from '../modals/NodeContentEditModal';
 import { THEMES } from '../../utils/themeConfig';
 import { getDefaultConnectorStyleForDiagram } from '../../utils/diagramConnectorConfig';
+import {
+  NodeAnchor,
+  getNodeAnchorCoords,
+  getClosestAnchor,
+  getAnchorLabel,
+} from '../../utils/diagramAnchors';
 
 interface DiagramCanvasProps {
   nodes: DiagramNode[];
@@ -133,7 +139,7 @@ export const DiagramCanvas: React.FC<DiagramCanvasProps> = ({
   // Edge drawing state
   const [connectingFrom, setConnectingFrom] = useState<{
     nodeId: string;
-    anchor: 'top' | 'right' | 'bottom' | 'left';
+    anchor: NodeAnchor;
   } | null>(null);
   const [currentMousePos, setCurrentMousePos] = useState({ x: 0, y: 0 });
 
@@ -594,26 +600,68 @@ export const DiagramCanvas: React.FC<DiagramCanvasProps> = ({
     setCurrentMousePos(canvasCoords);
   };
 
+  // Helper to construct a new edge with the chosen source and target anchors
+  const createEdge = useCallback(
+    (
+      sourceNodeId: string,
+      sourceAnchor: NodeAnchor,
+      targetNodeId: string,
+      targetAnchor: NodeAnchor
+    ) => {
+      const defaultRouting = getDefaultConnectorStyleForDiagram(diagramType);
+      const newEdge: DiagramEdge = {
+        id: `edge-${Date.now()}`,
+        sourceNodeId,
+        targetNodeId,
+        sourceAnchor,
+        targetAnchor,
+        type: defaultRouting,
+        lineStyle: 'solid',
+        markerStart: 'none',
+        markerEnd: diagramType === 'mindmap' ? 'none' : 'arrow',
+      };
+      onAddEdge(newEdge);
+    },
+    [diagramType, onAddEdge]
+  );
+
+  // Directly complete connection to a specific anchor on target node (via click or drop)
+  const handleCompleteConnection = useCallback(
+    (targetNodeId: string, targetAnchor: NodeAnchor) => {
+      if (connectingFrom && targetNodeId !== connectingFrom.nodeId) {
+        createEdge(connectingFrom.nodeId, connectingFrom.anchor, targetNodeId, targetAnchor);
+        setConnectingFrom(null);
+      }
+    },
+    [connectingFrom, createEdge]
+  );
+
   // Local mouse up on canvas (e.g., finishing edge drawing)
   const handleMouseUp = (e: React.MouseEvent) => {
     if (connectingFrom && !isReadOnly) {
+      // 1. Check if user released mouse directly on a specific anchor handle
+      const anchorElement = (e.target as HTMLElement).closest('[data-anchor-id]');
+      if (anchorElement) {
+        const targetAnchor = anchorElement.getAttribute('data-anchor-id') as NodeAnchor;
+        const targetNodeId = anchorElement.getAttribute('data-node-id');
+        if (targetNodeId && targetNodeId !== connectingFrom.nodeId) {
+          createEdge(connectingFrom.nodeId, connectingFrom.anchor, targetNodeId, targetAnchor);
+          setConnectingFrom(null);
+          return;
+        }
+      }
+
+      // 2. Check if user released mouse generally over a node container
       const targetElement = (e.target as HTMLElement).closest('[id^="node-"]');
       if (targetElement) {
         const targetNodeId = targetElement.id.replace('node-', '');
         if (targetNodeId !== connectingFrom.nodeId) {
-          const defaultRouting = getDefaultConnectorStyleForDiagram(diagramType);
-          const newEdge: DiagramEdge = {
-            id: `edge-${Date.now()}`,
-            sourceNodeId: connectingFrom.nodeId,
-            targetNodeId,
-            sourceAnchor: connectingFrom.anchor,
-            targetAnchor: 'left',
-            type: defaultRouting,
-            lineStyle: 'solid',
-            markerStart: 'none',
-            markerEnd: diagramType === 'mindmap' ? 'none' : 'arrow',
-          };
-          onAddEdge(newEdge);
+          const targetNode = nodes.find(n => n.id === targetNodeId);
+          if (targetNode) {
+            // Calculate closest of the 12 connection anchors to the release coordinates
+            const closestAnchor = getClosestAnchor(targetNode, currentMousePos.x, currentMousePos.y);
+            createEdge(connectingFrom.nodeId, connectingFrom.anchor, targetNodeId, closestAnchor);
+          }
         }
       }
       setConnectingFrom(null);
@@ -665,7 +713,7 @@ export const DiagramCanvas: React.FC<DiagramCanvasProps> = ({
           <span>
             Connecting from{' '}
             <strong>{nodes.find(n => n.id === connectingFrom.nodeId)?.label || 'Selected Node'}</strong>
-            : Click any target node to connect
+            {' '}({getAnchorLabel(connectingFrom.anchor)}): Click any anchor or target node to connect
           </span>
           <button
             onClick={() => setConnectingFrom(null)}
@@ -919,11 +967,11 @@ export const DiagramCanvas: React.FC<DiagramCanvasProps> = ({
           <line
             x1={(() => {
               const src = nodes.find(n => n.id === connectingFrom.nodeId);
-              return src ? src.x + src.width / 2 : currentMousePos.x;
+              return src ? getNodeAnchorCoords(src, connectingFrom.anchor).x : currentMousePos.x;
             })()}
             y1={(() => {
               const src = nodes.find(n => n.id === connectingFrom.nodeId);
-              return src ? src.y + src.height / 2 : currentMousePos.y;
+              return src ? getNodeAnchorCoords(src, connectingFrom.anchor).y : currentMousePos.y;
             })()}
             x2={currentMousePos.x}
             y2={currentMousePos.y}
@@ -961,6 +1009,9 @@ export const DiagramCanvas: React.FC<DiagramCanvasProps> = ({
               onStartConnection={(nodeId, anchor) => {
                 setConnectingFrom({ nodeId, anchor });
               }}
+              isConnectingActive={!!connectingFrom}
+              connectingSourceNodeId={connectingFrom?.nodeId || null}
+              onCompleteConnection={handleCompleteConnection}
               onOpenDoc={onOpenDoc}
               onUpdateLabel={onUpdateNodeLabel}
               onNodeContextMenu={handleNodeContextMenu}

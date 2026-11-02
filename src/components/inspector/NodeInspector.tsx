@@ -54,6 +54,10 @@ import {
   PASTEL_COLOR_PALETTES,
   ColorPaletteItem,
 } from '../../utils/colorUtils';
+import {
+  NODE_ANCHOR_DEFINITIONS,
+  NodeAnchor,
+} from '../../utils/diagramAnchors';
 
 interface NodeInspectorProps {
   selectedNode: DiagramNode | null;
@@ -315,6 +319,48 @@ export const NodeInspector: React.FC<NodeInspectorProps> = ({
               <option value="circle">Circle Marker</option>
               <option value="none">None (Clean Line - Mind Map)</option>
             </select>
+          </div>
+
+          {/* Connection Attachment Points (Multi-point sticking) */}
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className={`text-[10px] uppercase font-mono font-bold block mb-1.5 ${themeDef.textMutedClass}`}>
+                Source Point
+              </label>
+              <select
+                disabled={isReadOnly}
+                value={selectedEdge.sourceAnchor || 'bottom'}
+                onChange={e => onUpdateEdge?.({ ...selectedEdge, sourceAnchor: e.target.value as NodeAnchor })}
+                className={`w-full p-2 rounded-lg border text-xs focus:outline-none focus:border-blue-500 font-mono ${
+                  themeDef.isDark ? 'bg-slate-950 border-slate-800 text-slate-200' : 'bg-white border-slate-200 text-slate-800'
+                }`}
+              >
+                {NODE_ANCHOR_DEFINITIONS.map(def => (
+                  <option key={def.id} value={def.id}>
+                    {def.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className={`text-[10px] uppercase font-mono font-bold block mb-1.5 ${themeDef.textMutedClass}`}>
+                Target Point
+              </label>
+              <select
+                disabled={isReadOnly}
+                value={selectedEdge.targetAnchor || 'top'}
+                onChange={e => onUpdateEdge?.({ ...selectedEdge, targetAnchor: e.target.value as NodeAnchor })}
+                className={`w-full p-2 rounded-lg border text-xs focus:outline-none focus:border-blue-500 font-mono ${
+                  themeDef.isDark ? 'bg-slate-950 border-slate-800 text-slate-200' : 'bg-white border-slate-200 text-slate-800'
+                }`}
+              >
+                {NODE_ANCHOR_DEFINITIONS.map(def => (
+                  <option key={def.id} value={def.id}>
+                    {def.label}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
 
           {/* Stroke Color */}

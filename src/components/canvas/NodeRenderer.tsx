@@ -29,6 +29,7 @@ import {
   ChevronDown,
 } from 'lucide-react';
 import { getNodeBackgroundStyle, getDarkerShade } from '../../utils/colorUtils';
+import { NodeAnchor, NODE_ANCHOR_DEFINITIONS } from '../../utils/diagramAnchors';
 
 interface NodeRendererProps {
   node: DiagramNode;
@@ -36,6 +37,8 @@ interface NodeRendererProps {
   isDragging: boolean;
   collaborators: Collaborator[];
   isDeemphasized?: boolean;
+  isConnectingActive?: boolean;
+  connectingSourceNodeId?: string | null;
   onMouseEnterNode?: (nodeId: string) => void;
   onMouseLeaveNode?: (nodeId: string) => void;
   onNodeMouseDown?: (nodeId: string, e: React.MouseEvent) => void;
@@ -45,7 +48,8 @@ interface NodeRendererProps {
     e: React.MouseEvent
   ) => void;
   onDrillDown?: (pageId: string) => void;
-  onStartConnection?: (nodeId: string, anchor: 'top' | 'right' | 'bottom' | 'left', e: React.MouseEvent) => void;
+  onStartConnection?: (nodeId: string, anchor: NodeAnchor, e: React.MouseEvent) => void;
+  onCompleteConnection?: (targetNodeId: string, targetAnchor: NodeAnchor, e: React.MouseEvent) => void;
   onOpenDoc?: (node: DiagramNode) => void;
   onUpdateLabel?: (nodeId: string, newLabel: string) => void;
   onNodeContextMenu?: (nodeId: string, e: React.MouseEvent) => void;
@@ -60,12 +64,15 @@ export const NodeRenderer: React.FC<NodeRendererProps> = ({
   isDragging,
   collaborators,
   isDeemphasized = false,
+  isConnectingActive = false,
+  connectingSourceNodeId = null,
   onMouseEnterNode,
   onMouseLeaveNode,
   onNodeMouseDown,
   onStartResize,
   onDrillDown,
   onStartConnection,
+  onCompleteConnection,
   onOpenDoc,
   onUpdateLabel,
   onNodeContextMenu,
@@ -80,18 +87,53 @@ export const NodeRenderer: React.FC<NodeRendererProps> = ({
   const [showChildQuickMenu, setShowChildQuickMenu] = React.useState(false);
   const activeCollaborator = collaborators.find(c => c.selectedNodeId === node.id);
 
-  // Render anchor handles on hover for wiring connections
-  const renderAnchor = (anchor: 'top' | 'right' | 'bottom' | 'left', className: string) => {
+  // Render 12 perimeter anchor handles on hover or while connecting
+  const renderAnchors = () => {
     if (isReadOnly) return null;
+    const isSourceNode = isConnectingActive && connectingSourceNodeId === node.id;
+    const isTargetCandidate = isConnectingActive && connectingSourceNodeId !== node.id;
+
     return (
-      <div
-        className={`absolute w-3.5 h-3.5 rounded-full bg-blue-500 border-2 border-white dark:border-slate-900 shadow-md opacity-0 group-hover:opacity-100 hover:scale-125 transition-all z-30 cursor-crosshair ${className}`}
-        onMouseDown={e => {
-          e.stopPropagation();
-          onStartConnection?.(node.id, anchor, e);
-        }}
-        title={`Connect from ${anchor}`}
-      />
+      <>
+        {NODE_ANCHOR_DEFINITIONS.map(def => {
+          return (
+            <div
+              key={def.id}
+              data-anchor-id={def.id}
+              data-node-id={node.id}
+              style={def.positionStyle}
+              className={`absolute w-3 h-3 rounded-full border-2 transition-all z-30 cursor-crosshair pointer-events-auto ${
+                isTargetCandidate
+                  ? 'opacity-95 bg-sky-400 border-white dark:border-slate-900 shadow-md shadow-sky-500/50 hover:bg-emerald-400 hover:scale-150 hover:ring-2 hover:ring-emerald-300 animate-pulse'
+                  : isSourceNode
+                  ? 'opacity-85 bg-blue-600 border-white'
+                  : 'opacity-0 group-hover:opacity-100 bg-sky-500 hover:bg-emerald-400 border-white dark:border-slate-900 shadow-md hover:scale-140'
+              }`}
+              onMouseDown={e => {
+                e.stopPropagation();
+                onStartConnection?.(node.id, def.id, e);
+              }}
+              onMouseUp={e => {
+                if (isConnectingActive && isTargetCandidate) {
+                  e.stopPropagation();
+                  onCompleteConnection?.(node.id, def.id, e);
+                }
+              }}
+              onClick={e => {
+                if (isConnectingActive && isTargetCandidate) {
+                  e.stopPropagation();
+                  onCompleteConnection?.(node.id, def.id, e);
+                }
+              }}
+              title={
+                isTargetCandidate
+                  ? `Stick connection to ${def.label}`
+                  : `Connect from ${def.label}`
+              }
+            />
+          );
+        })}
+      </>
     );
   };
 
@@ -1305,11 +1347,8 @@ export const NodeRenderer: React.FC<NodeRendererProps> = ({
         onNodeContextMenu?.(node.id, e);
       }}
     >
-      {/* Connection Anchor Handles */}
-      {renderAnchor('top', '-top-1.5 left-1/2 -translate-x-1/2')}
-      {renderAnchor('right', '-right-1.5 top-1/2 -translate-y-1/2')}
-      {renderAnchor('bottom', '-bottom-1.5 left-1/2 -translate-x-1/2')}
-      {renderAnchor('left', '-left-1.5 top-1/2 -translate-y-1/2')}
+      {/* 12 Perimeter Connection Anchor Handles */}
+      {renderAnchors()}
 
       {/* Render Node Body */}
       {renderNodeBody()}
