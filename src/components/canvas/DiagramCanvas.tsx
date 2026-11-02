@@ -143,15 +143,36 @@ export const DiagramCanvas: React.FC<DiagramCanvasProps> = ({
   } | null>(null);
   const [currentMousePos, setCurrentMousePos] = useState({ x: 0, y: 0 });
 
-  // Hover state for highlighting connected/linked nodes (Change 2)
+  // Hover state for highlighting connected/linked nodes
   const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
 
-  // Active focus node for network connectivity highlight (hover takes priority, fallback to selection)
-  const activeFocusNodeId = hoveredNodeId || selectedNodeId;
+  // Clear hovered node when switching page or diagram file to ensure child diagram nodes are always enabled
+  useEffect(() => {
+    setHoveredNodeId(null);
+  }, [pageId, activeDiagramFilename]);
+
+  // If hovered node no longer exists in the current nodes list, reset immediately
+  useEffect(() => {
+    if (hoveredNodeId && !nodes.some(n => n.id === hoveredNodeId)) {
+      setHoveredNodeId(null);
+    }
+  }, [nodes, hoveredNodeId]);
+
+  // Active focus node for network connectivity highlight:
+  // Must be a node that actually exists in current nodes list so stale nodes from other diagrams never dim anything
+  const activeFocusNodeId = React.useMemo(() => {
+    if (hoveredNodeId && nodes.some(n => n.id === hoveredNodeId)) {
+      return hoveredNodeId;
+    }
+    return null;
+  }, [hoveredNodeId, nodes]);
 
   // Set of node IDs that are linked to the active focus node
   const linkedNodeIds = React.useMemo(() => {
     if (!activeFocusNodeId) return null;
+    const focusNode = nodes.find(n => n.id === activeFocusNodeId);
+    if (!focusNode) return null;
+
     const set = new Set<string>();
     set.add(activeFocusNodeId);
     for (const e of edges) {
@@ -163,7 +184,7 @@ export const DiagramCanvas: React.FC<DiagramCanvasProps> = ({
       }
     }
     return set;
-  }, [activeFocusNodeId, edges]);
+  }, [activeFocusNodeId, edges, nodes]);
 
   const isReadOnly = userRole === 'viewer';
 

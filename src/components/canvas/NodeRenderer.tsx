@@ -1364,6 +1364,9 @@ export const NodeRenderer: React.FC<NodeRendererProps> = ({
                 type="button"
                 onClick={e => {
                   e.stopPropagation();
+                  onMouseLeaveNode?.(node.id);
+                  setIsHovered(false);
+                  setMouseEntryPos(null);
                   onNavigateChildDiagram?.(single.filename);
                 }}
                 className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-purple-600 hover:bg-purple-500 text-white text-[9px] font-bold shadow-lg shadow-purple-900/50 border border-purple-300/40 cursor-pointer transition-all hover:scale-105 pointer-events-auto group"
@@ -1431,6 +1434,9 @@ export const NodeRenderer: React.FC<NodeRendererProps> = ({
                           onClick={e => {
                             e.stopPropagation();
                             setShowChildQuickMenu(false);
+                            onMouseLeaveNode?.(node.id);
+                            setIsHovered(false);
+                            setMouseEntryPos(null);
                             onNavigateChildDiagram?.(child.filename);
                           }}
                           className="w-full text-left px-2 py-1.5 rounded-md hover:bg-purple-900/40 text-slate-200 hover:text-white flex items-center justify-between gap-1 transition-colors cursor-pointer"
