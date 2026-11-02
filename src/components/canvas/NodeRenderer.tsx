@@ -1320,7 +1320,7 @@ export const NodeRenderer: React.FC<NodeRendererProps> = ({
         if (childDiagrams.length === 1) {
           const single = childDiagrams[0];
           return (
-            <div className="absolute -top-3.5 right-1 z-30 flex items-center gap-1">
+            <div className="absolute -bottom-3.5 right-1 z-30 flex items-center gap-1">
               <button
                 type="button"
                 onClick={e => {
@@ -1358,7 +1358,7 @@ export const NodeRenderer: React.FC<NodeRendererProps> = ({
           );
         } else if (childDiagrams.length > 1) {
           return (
-            <div className="absolute -top-3.5 right-1 z-30 flex items-center gap-1">
+            <div className="absolute -bottom-3.5 right-1 z-30 flex items-center gap-1">
               <div className="relative">
                 <button
                   type="button"
@@ -1376,7 +1376,7 @@ export const NodeRenderer: React.FC<NodeRendererProps> = ({
 
                 {showChildQuickMenu && (
                   <div
-                    className="absolute right-0 top-full mt-1 w-60 rounded-xl bg-slate-900/95 border border-purple-500/40 shadow-2xl p-1.5 text-xs z-50 backdrop-blur-md animate-in fade-in"
+                    className="absolute right-0 bottom-full mb-1 w-60 rounded-xl bg-slate-900/95 border border-purple-500/40 shadow-2xl p-1.5 text-xs z-50 backdrop-blur-md animate-in fade-in"
                     onClick={e => e.stopPropagation()}
                     onMouseLeave={() => setShowChildQuickMenu(false)}
                   >
@@ -1450,7 +1450,7 @@ export const NodeRenderer: React.FC<NodeRendererProps> = ({
                 e.stopPropagation();
                 onOpenChildDiagramModal?.(node);
               }}
-              className="absolute -top-3 right-2 z-30 flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-900/90 hover:bg-purple-600 text-purple-300 hover:text-white text-[9px] font-semibold shadow-md border border-purple-500/40 cursor-pointer transition-all hover:scale-105 pointer-events-auto"
+              className="absolute -bottom-3 right-2 z-30 flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-900/90 hover:bg-purple-600 text-purple-300 hover:text-white text-[9px] font-semibold shadow-md border border-purple-500/40 cursor-pointer transition-all hover:scale-105 pointer-events-auto"
               title="Create or link a dedicated child diagram JSON for this node"
             >
               <Plus className="w-2.5 h-2.5" />

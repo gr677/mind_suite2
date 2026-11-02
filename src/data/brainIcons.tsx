@@ -239,7 +239,7 @@ export const BRAIN_ICONS: BrainIconDefinition[] = [
 
   // 5. Minimalist Continuous Line
   {
-    id: 'zen-minimalist',
+    id: 'zen-continuous',
     name: '5. Minimalist Continuous Line',
     subtitle: 'Ultra-clean single-stroke Zen silhouette',
     description: 'Boutique single continuous line stroke that traces the lobes, cerebral loops, and central symmetry in an unbroken elegant curve. Pure, uncluttered, and contemporary.',
