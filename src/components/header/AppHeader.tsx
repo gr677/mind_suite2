@@ -113,9 +113,11 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
       <div className="flex items-center gap-3 min-w-0">
         {/* App Logo: Brain Icon & Title */}
         <div className={`flex items-center gap-2.5 pr-3 border-r shrink-0 ${isDark ? 'border-slate-800' : 'border-slate-200'}`}>
-          <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-blue-600 via-indigo-500 to-purple-500 flex items-center justify-center shadow-lg shadow-blue-500/25 text-white">
-            <Brain className="w-5 h-5 text-white" />
-          </div>
+          <img
+            src="/assets/aistudio/image_4852f408.png"
+            alt="OmniModel Studio"
+            className="w-8 h-8 rounded-lg object-cover shadow-md border border-purple-500/30"
+          />
           <div>
             <h1 className={`text-xs font-bold tracking-wide uppercase ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>OmniModel Studio</h1>
             <p className={`text-[9px] font-mono ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Enterprise Architecture Suite</p>
@@ -210,39 +212,6 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
             </div>
           )}
         </div>
-
-        {/* Manual Save Diagram Button with Unsaved Changes Indicator */}
-        <button
-          onClick={onManualSave}
-          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition-all shadow-md shrink-0 ${
-            saveStatus === 'unsaved'
-              ? 'bg-amber-600 hover:bg-amber-500 text-white ring-2 ring-amber-400/40 shadow-amber-600/30 animate-pulse'
-              : saveStatus === 'saved'
-              ? 'bg-emerald-600 text-white shadow-emerald-500/20'
-              : saveStatus === 'saving'
-              ? 'bg-blue-600 text-white opacity-80'
-              : 'bg-blue-600 hover:bg-blue-500 text-white'
-          }`}
-          title={`Save active diagram '${activeDiagramFilename || 'root.json'}' to C:\\omnimind\\${activeWorkspaceName || 'workspace1'}\\data\\${activeDiagramFilename || 'root.json'} (Ctrl+S)`}
-        >
-          {saveStatus === 'saved' ? (
-            <Check className="w-3.5 h-3.5" />
-          ) : (
-            <Save className="w-3.5 h-3.5" />
-          )}
-          <span>
-            {saveStatus === 'saved'
-              ? 'Saved!'
-              : saveStatus === 'saving'
-              ? 'Saving...'
-              : saveStatus === 'unsaved'
-              ? 'Save Changes *'
-              : 'Save'}
-          </span>
-          <kbd className="hidden lg:inline text-[9px] font-mono px-1 py-0.2 rounded bg-black/25 opacity-80">
-            Ctrl+S
-          </kbd>
-        </button>
       </div>
 
       {/* Right: Gallery, Tools Menu, Settings & Theme */}
@@ -429,6 +398,39 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
         >
           <Settings className="w-3.5 h-3.5 text-purple-400" />
           <span className="hidden sm:inline">Settings</span>
+        </button>
+
+        {/* Manual Save Diagram Button (Placed between Settings and Theme toggle) */}
+        <button
+          onClick={onManualSave}
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition-all shadow-md shrink-0 ${
+            saveStatus === 'unsaved'
+              ? 'bg-amber-600 hover:bg-amber-500 text-white ring-2 ring-amber-400/40 shadow-amber-600/30 animate-pulse'
+              : saveStatus === 'saved'
+              ? 'bg-emerald-600 text-white shadow-emerald-500/20'
+              : saveStatus === 'saving'
+              ? 'bg-blue-600 text-white opacity-80'
+              : 'bg-blue-600 hover:bg-blue-500 text-white'
+          }`}
+          title={`Save active diagram '${activeDiagramFilename || 'root.json'}' (Ctrl+S)`}
+        >
+          {saveStatus === 'saved' ? (
+            <Check className="w-3.5 h-3.5" />
+          ) : (
+            <Save className="w-3.5 h-3.5" />
+          )}
+          <span>
+            {saveStatus === 'saved'
+              ? 'Saved!'
+              : saveStatus === 'saving'
+              ? 'Saving...'
+              : saveStatus === 'unsaved'
+              ? 'Save Changes *'
+              : 'Save'}
+          </span>
+          <kbd className="hidden lg:inline text-[9px] font-mono px-1 py-0.2 rounded bg-black/25 opacity-80">
+            Ctrl+S
+          </kbd>
         </button>
 
         {/* Quick Theme Switcher Button */}

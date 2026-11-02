@@ -16,16 +16,9 @@ import {
 import { NodeRenderer } from './NodeRenderer';
 import { EdgeRenderer } from './EdgeRenderer';
 import {
-  ZoomIn,
-  ZoomOut,
-  Maximize2,
-  Grid,
-  Magnet,
   Trash2,
   Plus,
   Compass,
-  Settings,
-  Link2,
   CornerDownRight,
   Spline,
   Minus,
@@ -665,115 +658,6 @@ export const DiagramCanvas: React.FC<DiagramCanvasProps> = ({
       onDrop={handleDrop}
       onContextMenu={handleCanvasContextMenu}
     >
-      {/* Interactive Floating Canvas Toolbar */}
-      <div className={`absolute top-4 left-6 z-30 flex items-center gap-1.5 rounded-lg p-1.5 shadow-xl backdrop-blur-md border ${themeDef.panelClass}`}>
-        <button
-          onClick={() => setZoom(z => Math.max(z - 0.15, 0.4))}
-          className={`p-1.5 rounded cursor-pointer transition-colors ${themeDef.isDark ? 'hover:bg-slate-800 text-slate-300' : 'hover:bg-slate-100 text-slate-600'}`}
-          title="Zoom Out"
-        >
-          <ZoomOut className="w-4 h-4" />
-        </button>
-        <span className={`text-xs font-mono px-1 min-w-[45px] text-center ${themeDef.textPrimaryClass}`}>
-          {Math.round(zoom * 100)}%
-        </span>
-        <button
-          onClick={() => setZoom(z => Math.min(z + 0.15, 2.2))}
-          className={`p-1.5 rounded cursor-pointer transition-colors ${themeDef.isDark ? 'hover:bg-slate-800 text-slate-300' : 'hover:bg-slate-100 text-slate-600'}`}
-          title="Zoom In"
-        >
-          <ZoomIn className="w-4 h-4" />
-        </button>
-        <div className={`w-[1px] h-4 mx-1 ${themeDef.isDark ? 'bg-slate-700' : 'bg-slate-300'}`} />
-        <button
-          onClick={() => {
-            setZoom(1);
-            setPan({ x: 0, y: 0 });
-          }}
-          className={`p-1.5 rounded cursor-pointer transition-colors ${themeDef.isDark ? 'hover:bg-slate-800 text-slate-300' : 'hover:bg-slate-100 text-slate-600'}`}
-          title="Reset View (100%)"
-        >
-          <Maximize2 className="w-4 h-4" />
-        </button>
-        <button
-          onClick={() => setShowGrid(g => !g)}
-          className={`p-1.5 rounded cursor-pointer transition-colors ${
-            showGrid ? 'bg-blue-600/30 text-blue-400' : themeDef.isDark ? 'hover:bg-slate-800 text-slate-400' : 'hover:bg-slate-100 text-slate-500'
-          }`}
-          title="Toggle Canvas Grid"
-        >
-          <Grid className="w-4 h-4" />
-        </button>
-        <button
-          onClick={() => setGridSnap(s => !s)}
-          className={`p-1.5 rounded cursor-pointer transition-colors ${
-            gridSnap ? 'bg-emerald-600/30 text-emerald-400' : themeDef.isDark ? 'hover:bg-slate-800 text-slate-400' : 'hover:bg-slate-100 text-slate-500'
-          }`}
-          title="Toggle Grid Snapping"
-        >
-          <Magnet className="w-4 h-4" />
-        </button>
-        {selectedNodeId && !isReadOnly && (
-          <>
-            <div className={`w-[1px] h-4 mx-1 ${themeDef.isDark ? 'bg-slate-700' : 'bg-slate-300'}`} />
-            <button
-              onClick={onDeleteSelected}
-              className="p-1.5 hover:bg-rose-500/20 text-rose-400 rounded cursor-pointer transition-colors"
-              title="Delete Selected Shape (Del)"
-            >
-              <Trash2 className="w-4 h-4" />
-            </button>
-          </>
-        )}
-        {/* Dedicated Connect Nodes Tool Button */}
-        {!isReadOnly && (
-          <>
-            <div className={`w-[1px] h-4 mx-1 ${themeDef.isDark ? 'bg-slate-700' : 'bg-slate-300'}`} />
-            <button
-              onClick={() => {
-                if (connectingFrom) {
-                  setConnectingFrom(null);
-                } else if (selectedNodeId) {
-                  setConnectingFrom({ nodeId: selectedNodeId, anchor: 'right' });
-                } else if (nodes.length > 0) {
-                  setConnectingFrom({ nodeId: nodes[0].id, anchor: 'right' });
-                }
-              }}
-              className={`p-1.5 rounded cursor-pointer transition-colors flex items-center gap-1 ${
-                connectingFrom
-                  ? 'bg-blue-600 text-white shadow-md ring-2 ring-blue-400'
-                  : themeDef.isDark
-                  ? 'hover:bg-slate-800 text-slate-300'
-                  : 'hover:bg-slate-100 text-slate-600'
-              }`}
-              title={
-                connectingFrom
-                  ? 'Connecting active (Click target node or click here to cancel)'
-                  : selectedNodeId
-                  ? 'Connect Selected Node to another node'
-                  : 'Connect Nodes Tool'
-              }
-            >
-              <Link2 className="w-4 h-4" />
-            </button>
-          </>
-        )}
-        {onOpenSettingsModal && (
-          <>
-            <div className={`w-[1px] h-4 mx-1 ${themeDef.isDark ? 'bg-slate-700' : 'bg-slate-300'}`} />
-            <button
-              onClick={onOpenSettingsModal}
-              className={`p-1.5 rounded cursor-pointer transition-colors ${
-                themeDef.isDark ? 'hover:bg-slate-800 text-slate-400 hover:text-slate-200' : 'hover:bg-slate-100 text-slate-500 hover:text-slate-800'
-              }`}
-              title="Studio Settings & Themes"
-            >
-              <Settings className="w-4 h-4" />
-            </button>
-          </>
-        )}
-      </div>
-
       {/* Floating Connecting Instructions Banner */}
       {connectingFrom && (
         <div className="absolute top-4 left-1/2 -translate-x-1/2 z-40 bg-blue-600 text-white px-4 py-2 rounded-xl shadow-2xl flex items-center gap-3 text-xs font-medium animate-in fade-in slide-in-from-top-3">

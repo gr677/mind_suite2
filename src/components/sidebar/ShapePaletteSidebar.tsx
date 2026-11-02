@@ -248,35 +248,6 @@ export const ShapePaletteSidebar: React.FC<ShapePaletteSidebarProps> = ({
           </span>
         </div>
 
-        <div className="flex items-center justify-between pt-0.5">
-          <div className="flex items-center gap-2">
-            <div className="p-1.5 bg-blue-600/20 border border-blue-500/30 rounded-lg text-blue-400">
-              <Grid className="w-4 h-4" />
-            </div>
-            <div>
-              <h2 className={`text-xs font-bold uppercase tracking-wider ${themeDef.textPrimaryClass}`}>Shape Library</h2>
-              <p className={`text-[10px] ${themeDef.textMutedClass}`}>Drag &amp; drop onto canvas</p>
-            </div>
-          </div>
-          {isReadOnly && (
-            <span className="px-1.5 py-0.5 bg-slate-800 text-slate-400 rounded text-[9px] font-mono">
-              Read-Only
-            </span>
-          )}
-        </div>
-
-        {/* Big Diagram Gallery button */}
-        <button
-          onClick={onOpenGallery}
-          className="w-full flex items-center justify-between px-2.5 py-1.5 bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 border border-blue-500/40 rounded-lg text-xs font-semibold cursor-pointer transition-colors shadow-sm"
-        >
-          <div className="flex items-center gap-1.5">
-            <BookOpen className="w-3.5 h-3.5 text-blue-400" />
-            <span>Diagram Standards (18+)</span>
-          </div>
-          <span className="px-1.5 py-0.2 bg-blue-500/30 rounded text-[9px] font-mono">Gallery</span>
-        </button>
-
         {/* Search input */}
         <div className="relative">
           <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />

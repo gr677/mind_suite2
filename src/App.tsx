@@ -961,8 +961,8 @@ export default function App() {
           }}
         />
 
-        {/* Right Sidebar: Inspector, Documentation, Comments & Groups */}
-        {isInspectorOpen && (
+        {/* Right Sidebar: Inspector, Documentation, Comments & Groups (Only displayed when a node or connector is selected) */}
+        {isInspectorOpen && (selectedNode || selectedEdgeId) && (
           <NodeInspector
             selectedNode={selectedNode}
             selectedEdge={currentPage.edges.find(e => e.id === selectedEdgeId) || null}
