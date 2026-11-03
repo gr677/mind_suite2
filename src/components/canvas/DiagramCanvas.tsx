@@ -43,6 +43,7 @@ interface DiagramCanvasProps {
   edges: DiagramEdge[];
   collaborators: Collaborator[];
   selectedNodeId: string | null;
+  selectedNodeIds?: string[];
   selectedEdgeId: string | null;
   userRole: UserRole;
   theme: AppTheme;
@@ -50,7 +51,8 @@ interface DiagramCanvasProps {
   settings: StudioSettings;
   pageId?: string;
   activeDiagramFilename?: string;
-  onSelectNode: (nodeId: string | null) => void;
+  onSelectNode: (nodeId: string | null, isMultiSelect?: boolean) => void;
+  onSelectMultipleNodes?: (nodeIds: string[]) => void;
   onSelectEdge: (edgeId: string | null) => void;
   onUpdateNodes: (nodes: DiagramNode[]) => void;
   onAddEdge: (edge: DiagramEdge) => void;
@@ -73,6 +75,7 @@ export const DiagramCanvas: React.FC<DiagramCanvasProps> = ({
   edges,
   collaborators,
   selectedNodeId,
+  selectedNodeIds = [],
   selectedEdgeId,
   userRole,
   theme,
@@ -81,6 +84,7 @@ export const DiagramCanvas: React.FC<DiagramCanvasProps> = ({
   pageId,
   activeDiagramFilename,
   onSelectNode,
+  onSelectMultipleNodes,
   onSelectEdge,
   onUpdateNodes,
   onAddEdge,
@@ -101,6 +105,13 @@ export const DiagramCanvas: React.FC<DiagramCanvasProps> = ({
   const themeDef = THEMES[theme] || THEMES.dark;
   const selectedEdge = edges.find(e => e.id === selectedEdgeId);
   const defaultConnectorStyle = getDefaultConnectorStyleForDiagram(diagramType);
+
+  // Multi-node selection consolidation
+  const effectiveSelectedNodeIds = React.useMemo(() => {
+    if (selectedNodeIds && selectedNodeIds.length > 0) return selectedNodeIds;
+    if (selectedNodeId) return [selectedNodeId];
+    return [];
+  }, [selectedNodeIds, selectedNodeId]);
 
   // Viewport transformation
   const [zoom, setZoom] = useState(1);
@@ -123,10 +134,19 @@ export const DiagramCanvas: React.FC<DiagramCanvasProps> = ({
   const [contextMenu, setContextMenu] = useState<ContextMenuPosition | null>(null);
   const [editingNodeForModal, setEditingNodeForModal] = useState<DiagramNode | null>(null);
 
-  // Node Dragging state
+  // Marquee Selection Box State (for dragging a selection box across multiple nodes)
+  const [marqueeBox, setMarqueeBox] = useState<{
+    startX: number;
+    startY: number;
+    currentX: number;
+    currentY: number;
+    isShift: boolean;
+  } | null>(null);
+
+  // Node Dragging state (supports dragging multiple selected nodes together)
   const [draggingNodeId, setDraggingNodeId] = useState<string | null>(null);
-  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
-  const [initialChildPositions, setInitialChildPositions] = useState<Record<string, { x: number; y: number }>>({});
+  const [dragStartPos, setDragStartPos] = useState({ x: 0, y: 0 });
+  const [initialDragPositions, setInitialDragPositions] = useState<Record<string, { x: number; y: number }>>({});
 
   // Node Resizing state
   const [resizing, setResizing] = useState<{
@@ -140,11 +160,19 @@ export const DiagramCanvas: React.FC<DiagramCanvasProps> = ({
     initialHeight: number;
   } | null>(null);
 
-  // Edge drawing state
+  // New Edge drawing state
   const [connectingFrom, setConnectingFrom] = useState<{
     nodeId: string;
     anchor: NodeAnchor;
   } | null>(null);
+
+  // Reconnecting existing edge endpoint state (Change 1)
+  // When an anchor has multiple connections, only this chosen edge's endpoint moves!
+  const [reconnectingEdge, setReconnectingEdge] = useState<{
+    edgeId: string;
+    endpoint: 'source' | 'target';
+  } | null>(null);
+
   const [currentMousePos, setCurrentMousePos] = useState({ x: 0, y: 0 });
 
   // Hover state for highlighting connected/linked nodes
@@ -162,8 +190,7 @@ export const DiagramCanvas: React.FC<DiagramCanvasProps> = ({
     }
   }, [nodes, hoveredNodeId]);
 
-  // Active focus node for network connectivity highlight:
-  // Must be a node that actually exists in current nodes list so stale nodes from other diagrams never dim anything
+  // Active focus node for network connectivity highlight
   const activeFocusNodeId = React.useMemo(() => {
     if (hoveredNodeId && nodes.some(n => n.id === hoveredNodeId)) {
       return hoveredNodeId;
@@ -196,7 +223,9 @@ export const DiagramCanvas: React.FC<DiagramCanvasProps> = ({
   const handleNodeContextMenu = (nodeId: string, e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    onSelectNode(nodeId);
+    if (!effectiveSelectedNodeIds.includes(nodeId)) {
+      onSelectNode(nodeId, false);
+    }
     onSelectEdge(null);
     setContextMenu({ x: e.clientX, y: e.clientY, nodeId });
   };
@@ -208,7 +237,11 @@ export const DiagramCanvas: React.FC<DiagramCanvasProps> = ({
 
   const handleDeleteNode = (nodeId: string) => {
     onUpdateNodes(nodes.filter(n => n.id !== nodeId));
-    if (selectedNodeId === nodeId) onSelectNode(null);
+    if (effectiveSelectedNodeIds.includes(nodeId)) {
+      onSelectMultipleNodes
+        ? onSelectMultipleNodes(effectiveSelectedNodeIds.filter(id => id !== nodeId))
+        : onSelectNode(null);
+    }
   };
 
   const handleDuplicateNode = (nodeId: string) => {
@@ -276,8 +309,12 @@ export const DiagramCanvas: React.FC<DiagramCanvasProps> = ({
   };
 
   const handleChangeColor = (nodeId: string, fill: string, stroke: string) => {
+    const targets = effectiveSelectedNodeIds.includes(nodeId)
+      ? effectiveSelectedNodeIds
+      : [nodeId];
+
     const updated = nodes.map(n => {
-      if (n.id !== nodeId) return n;
+      if (!targets.includes(n.id)) return n;
       return {
         ...n,
         style: {
@@ -290,7 +327,7 @@ export const DiagramCanvas: React.FC<DiagramCanvasProps> = ({
     onUpdateNodes(updated);
   };
 
-  // Direct edge connection helper for context menu & toolbar
+  // Direct edge connection helper
   const handleConnectDirect = (sourceNodeId: string, targetNodeId: string) => {
     if (sourceNodeId === targetNodeId) return;
     const defaultRouting = getDefaultConnectorStyleForDiagram(diagramType);
@@ -349,7 +386,6 @@ export const DiagramCanvas: React.FC<DiagramCanvasProps> = ({
       const mouseX = e.clientX - rect.left;
       const mouseY = e.clientY - rect.top;
 
-      // Zoom towards mouse pointer
       setPan(prev => ({
         x: mouseX - (mouseX - prev.x) * (newZoom / zoom),
         y: mouseY - (mouseY - prev.y) * (newZoom / zoom),
@@ -386,11 +422,23 @@ export const DiagramCanvas: React.FC<DiagramCanvasProps> = ({
     }
   };
 
-  // Direct Node Mouse Down for robust dragging & selection
+  // Start reconnecting an existing edge endpoint (Change 1)
+  const handleStartReconnectEdge = (
+    edgeId: string,
+    endpoint: 'source' | 'target',
+    e: React.MouseEvent
+  ) => {
+    if (isReadOnly) return;
+    e.stopPropagation();
+    onSelectEdge(edgeId);
+    setReconnectingEdge({ edgeId, endpoint });
+  };
+
+  // Direct Node Mouse Down for selection and batch dragging (Change 3)
   const handleNodeMouseDown = (nodeId: string, e: React.MouseEvent) => {
     if (e.button !== 0) return;
 
-    // If currently in connecting mode, click target node creates wire!
+    // If currently in connecting mode, click target node completes wire
     if (connectingFrom && !isReadOnly) {
       if (connectingFrom.nodeId !== nodeId) {
         handleConnectDirect(connectingFrom.nodeId, nodeId);
@@ -399,32 +447,54 @@ export const DiagramCanvas: React.FC<DiagramCanvasProps> = ({
       return;
     }
 
-    onSelectNode(nodeId);
-    onSelectEdge(null);
+    // If currently reconnecting an edge endpoint, drop onto this node
+    if (reconnectingEdge && !isReadOnly) {
+      const targetNode = nodes.find(n => n.id === nodeId);
+      if (targetNode) {
+        const closestAnchor = getClosestAnchor(targetNode, currentMousePos.x, currentMousePos.y);
+        handleCompleteConnection(nodeId, closestAnchor);
+      }
+      return;
+    }
+
+    const isMultiKey = e.shiftKey || e.metaKey || e.ctrlKey;
+
+    if (isMultiKey) {
+      onSelectNode(nodeId, true);
+      onSelectEdge(null);
+      return;
+    }
+
+    // Normal click: if node is not already selected, select it as sole node
+    const isAlreadySelected = effectiveSelectedNodeIds.includes(nodeId);
+    if (!isAlreadySelected) {
+      onSelectNode(nodeId, false);
+      onSelectEdge(null);
+    }
 
     if (isReadOnly) return;
 
-    const clickedNode = nodes.find(n => n.id === nodeId);
-    if (clickedNode) {
-      const canvasCoords = screenToCanvasCoords(e.clientX, e.clientY);
-      setDraggingNodeId(nodeId);
-      setDragOffset({
-        x: canvasCoords.x - clickedNode.x,
-        y: canvasCoords.y - clickedNode.y,
-      });
+    // Setup multi-node dragging for all selected nodes
+    const canvasCoords = screenToCanvasCoords(e.clientX, e.clientY);
+    const activeDragIds = isAlreadySelected ? effectiveSelectedNodeIds : [nodeId];
 
-      // If this node is a group container, capture all child node positions for synced movement!
-      if (clickedNode.isGroup) {
-        const children: Record<string, { x: number; y: number }> = {};
-        nodes.filter(n => n.parentId === clickedNode.id).forEach(c => {
-          children[c.id] = { x: c.x, y: c.y };
-        });
-        setInitialChildPositions(children);
+    const positions: Record<string, { x: number; y: number }> = {};
+    nodes.forEach(n => {
+      if (activeDragIds.includes(n.id)) {
+        positions[n.id] = { x: n.x, y: n.y };
       }
-    }
+      // If any of the dragged nodes is a group, capture its children too
+      if (n.parentId && activeDragIds.includes(n.parentId)) {
+        positions[n.id] = { x: n.x, y: n.y };
+      }
+    });
+
+    setDraggingNodeId(nodeId);
+    setDragStartPos(canvasCoords);
+    setInitialDragPositions(positions);
   };
 
-  // Mouse Down on Canvas (Pan or background click)
+  // Mouse Down on Canvas (Pan or background click / Marquee box selection)
   const handleMouseDown = (e: React.MouseEvent) => {
     const target = e.target as HTMLElement;
     const isBackground =
@@ -434,18 +504,34 @@ export const DiagramCanvas: React.FC<DiagramCanvasProps> = ({
       target.tagName === 'svg' ||
       target.tagName === 'rect';
 
-    if (e.button === 1 || (e.button === 0 && isBackground)) {
+    // Middle-click pans
+    if (e.button === 1 || (e.button === 0 && e.altKey)) {
       setIsPanning(true);
       setPanStart({ x: e.clientX - pan.x, y: e.clientY - pan.y });
-      onSelectNode(null);
-      onSelectEdge(null);
       return;
+    }
+
+    // Left click on background: start marquee box selection
+    if (e.button === 0 && isBackground) {
+      const coords = screenToCanvasCoords(e.clientX, e.clientY);
+      setMarqueeBox({
+        startX: coords.x,
+        startY: coords.y,
+        currentX: coords.x,
+        currentY: coords.y,
+        isShift: e.shiftKey || e.metaKey || e.ctrlKey,
+      });
+
+      if (!e.shiftKey && !e.metaKey && !e.ctrlKey) {
+        onSelectNode(null);
+        onSelectEdge(null);
+      }
     }
   };
 
-  // Window-level mouse move and mouse up listeners while dragging, resizing, or panning
+  // Window-level mouse move and mouse up listeners
   useEffect(() => {
-    if (!isPanning && !draggingNodeId && !resizing) return;
+    if (!isPanning && !draggingNodeId && !resizing && !marqueeBox && !reconnectingEdge && !connectingFrom) return;
 
     const onWindowMouseMove = (e: MouseEvent) => {
       const canvasCoords = screenToCanvasCoords(e.clientX, e.clientY);
@@ -456,6 +542,33 @@ export const DiagramCanvas: React.FC<DiagramCanvasProps> = ({
           x: e.clientX - panStart.x,
           y: e.clientY - panStart.y,
         });
+        return;
+      }
+
+      // Handle Marquee Box Selection
+      if (marqueeBox) {
+        setMarqueeBox(prev => (prev ? { ...prev, currentX: canvasCoords.x, currentY: canvasCoords.y } : null));
+
+        const minX = Math.min(marqueeBox.startX, canvasCoords.x);
+        const maxX = Math.max(marqueeBox.startX, canvasCoords.x);
+        const minY = Math.min(marqueeBox.startY, canvasCoords.y);
+        const maxY = Math.max(marqueeBox.startY, canvasCoords.y);
+
+        // Find intersecting nodes
+        const intersectingIds = nodes
+          .filter(n => {
+            const nodeRight = n.x + n.width;
+            const nodeBottom = n.y + n.height;
+            return !(nodeRight < minX || n.x > maxX || nodeBottom < minY || n.y > maxY);
+          })
+          .map(n => n.id);
+
+        if (onSelectMultipleNodes) {
+          const finalIds = marqueeBox.isShift
+            ? Array.from(new Set([...effectiveSelectedNodeIds, ...intersectingIds]))
+            : intersectingIds;
+          onSelectMultipleNodes(finalIds);
+        }
         return;
       }
 
@@ -530,40 +643,28 @@ export const DiagramCanvas: React.FC<DiagramCanvasProps> = ({
         return;
       }
 
-      // Handle Node Dragging
+      // Handle Node Dragging (Batch multi-node movement)
       if (draggingNodeId && !isReadOnly) {
-        const nodeIndex = nodes.findIndex(n => n.id === draggingNodeId);
-        if (nodeIndex !== -1) {
-          const currentNode = nodes[nodeIndex];
-          let newX = canvasCoords.x - dragOffset.x;
-          let newY = canvasCoords.y - dragOffset.y;
+        let deltaX = canvasCoords.x - dragStartPos.x;
+        let deltaY = canvasCoords.y - dragStartPos.y;
 
-          if (gridSnap) {
-            newX = Math.round(newX / 20) * 20;
-            newY = Math.round(newY / 20) * 20;
-          }
-
-          const deltaX = newX - currentNode.x;
-          const deltaY = newY - currentNode.y;
-
-          const updatedNodes = [...nodes];
-          updatedNodes[nodeIndex] = { ...currentNode, x: newX, y: newY };
-
-          // Synchronously move all nested child nodes if moving a group container!
-          if (currentNode.isGroup) {
-            nodes.forEach((n, idx) => {
-              if (n.parentId === currentNode.id) {
-                updatedNodes[idx] = {
-                  ...n,
-                  x: n.x + deltaX,
-                  y: n.y + deltaY,
-                };
-              }
-            });
-          }
-
-          onUpdateNodes(updatedNodes);
+        if (gridSnap) {
+          deltaX = Math.round(deltaX / 20) * 20;
+          deltaY = Math.round(deltaY / 20) * 20;
         }
+
+        const updatedNodes = nodes.map(n => {
+          if (initialDragPositions[n.id]) {
+            return {
+              ...n,
+              x: initialDragPositions[n.id].x + deltaX,
+              y: initialDragPositions[n.id].y + deltaY,
+            };
+          }
+          return n;
+        });
+
+        onUpdateNodes(updatedNodes);
       }
     };
 
@@ -572,31 +673,51 @@ export const DiagramCanvas: React.FC<DiagramCanvasProps> = ({
         setIsPanning(false);
       }
 
+      if (marqueeBox) {
+        const dragDist = Math.hypot(
+          marqueeBox.currentX - marqueeBox.startX,
+          marqueeBox.currentY - marqueeBox.startY
+        );
+        if (dragDist < 5 && !marqueeBox.isShift) {
+          onSelectNode(null);
+          onSelectEdge(null);
+        }
+        setMarqueeBox(null);
+      }
+
       if (resizing) {
         setResizing(null);
       }
 
       if (draggingNodeId && !isReadOnly) {
-        const movedNode = nodes.find(n => n.id === draggingNodeId);
-        if (movedNode && !movedNode.isGroup) {
-          const enclosingGroup = nodes.find(
-            g =>
-              g.isGroup &&
-              g.id !== movedNode.id &&
-              movedNode.x >= g.x &&
-              movedNode.y >= g.y &&
-              movedNode.x + movedNode.width <= g.x + g.width &&
-              movedNode.y + movedNode.height <= g.y + g.height
-          );
+        setDraggingNodeId(null);
+        setInitialDragPositions({});
+      }
 
-          if (enclosingGroup && movedNode.parentId !== enclosingGroup.id) {
-            const updated = nodes.map(n =>
-              n.id === movedNode.id ? { ...n, parentId: enclosingGroup.id } : n
-            );
-            onUpdateNodes(updated);
+      // Handle releasing a reconnecting edge endpoint anywhere on window
+      if (reconnectingEdge && !isReadOnly && onUpdateEdge) {
+        const anchorElement = (e.target as HTMLElement).closest('[data-anchor-id]');
+        if (anchorElement) {
+          const targetAnchor = anchorElement.getAttribute('data-anchor-id') as NodeAnchor;
+          const targetNodeId = anchorElement.getAttribute('data-node-id');
+          if (targetNodeId && targetAnchor) {
+            handleCompleteConnection(targetNodeId, targetAnchor);
+            return;
           }
         }
-        setDraggingNodeId(null);
+
+        const nodeElement = (e.target as HTMLElement).closest('[id^="node-"]');
+        if (nodeElement) {
+          const targetNodeId = nodeElement.id.replace('node-', '');
+          const targetNode = nodes.find(n => n.id === targetNodeId);
+          if (targetNode) {
+            const closestAnchor = getClosestAnchor(targetNode, currentMousePos.x, currentMousePos.y);
+            handleCompleteConnection(targetNodeId, closestAnchor);
+            return;
+          }
+        }
+
+        setReconnectingEdge(null);
       }
     };
 
@@ -610,16 +731,26 @@ export const DiagramCanvas: React.FC<DiagramCanvasProps> = ({
     isPanning,
     panStart,
     draggingNodeId,
-    dragOffset,
+    dragStartPos,
+    initialDragPositions,
     resizing,
+    marqueeBox,
+    reconnectingEdge,
+    connectingFrom,
     gridSnap,
     isReadOnly,
     nodes,
+    effectiveSelectedNodeIds,
+    currentMousePos,
     onUpdateNodes,
+    onSelectMultipleNodes,
+    onSelectNode,
+    onSelectEdge,
+    onUpdateEdge,
     screenToCanvasCoords,
   ]);
 
-  // Local canvas mouse move for cursor position and edge drawing
+  // Local canvas mouse move for cursor position
   const handleMouseMove = (e: React.MouseEvent) => {
     const canvasCoords = screenToCanvasCoords(e.clientX, e.clientY);
     setCurrentMousePos(canvasCoords);
@@ -650,21 +781,43 @@ export const DiagramCanvas: React.FC<DiagramCanvasProps> = ({
     [diagramType, onAddEdge]
   );
 
-  // Directly complete connection to a specific anchor on target node (via click or drop)
+  // Directly complete connection or endpoint reconnection to a specific anchor on target node (Change 1)
   const handleCompleteConnection = useCallback(
     (targetNodeId: string, targetAnchor: NodeAnchor) => {
+      // 1. Completing endpoint reconnection of an existing edge
+      if (reconnectingEdge && onUpdateEdge) {
+        const edgeToUpdate = edges.find(e => e.id === reconnectingEdge.edgeId);
+        if (edgeToUpdate) {
+          if (reconnectingEdge.endpoint === 'source') {
+            onUpdateEdge({
+              ...edgeToUpdate,
+              sourceNodeId: targetNodeId,
+              sourceAnchor: targetAnchor,
+            });
+          } else {
+            onUpdateEdge({
+              ...edgeToUpdate,
+              targetNodeId: targetNodeId,
+              targetAnchor: targetAnchor,
+            });
+          }
+        }
+        setReconnectingEdge(null);
+        return;
+      }
+
+      // 2. Completing brand new connection
       if (connectingFrom && targetNodeId !== connectingFrom.nodeId) {
         createEdge(connectingFrom.nodeId, connectingFrom.anchor, targetNodeId, targetAnchor);
         setConnectingFrom(null);
       }
     },
-    [connectingFrom, createEdge]
+    [reconnectingEdge, connectingFrom, edges, onUpdateEdge, createEdge]
   );
 
-  // Local mouse up on canvas (e.g., finishing edge drawing)
+  // Local mouse up on canvas
   const handleMouseUp = (e: React.MouseEvent) => {
     if (connectingFrom && !isReadOnly) {
-      // 1. Check if user released mouse directly on a specific anchor handle
       const anchorElement = (e.target as HTMLElement).closest('[data-anchor-id]');
       if (anchorElement) {
         const targetAnchor = anchorElement.getAttribute('data-anchor-id') as NodeAnchor;
@@ -676,14 +829,12 @@ export const DiagramCanvas: React.FC<DiagramCanvasProps> = ({
         }
       }
 
-      // 2. Check if user released mouse generally over a node container
       const targetElement = (e.target as HTMLElement).closest('[id^="node-"]');
       if (targetElement) {
         const targetNodeId = targetElement.id.replace('node-', '');
         if (targetNodeId !== connectingFrom.nodeId) {
           const targetNode = nodes.find(n => n.id === targetNodeId);
           if (targetNode) {
-            // Calculate closest of the 12 connection anchors to the release coordinates
             const closestAnchor = getClosestAnchor(targetNode, currentMousePos.x, currentMousePos.y);
             createEdge(connectingFrom.nodeId, connectingFrom.anchor, targetNodeId, closestAnchor);
           }
@@ -693,20 +844,20 @@ export const DiagramCanvas: React.FC<DiagramCanvasProps> = ({
     }
   };
 
-  // Keyboard shortcut listener (Delete selected node, cancel connecting)
+  // Keyboard shortcut listener (Delete selected nodes, cancel connecting)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && connectingFrom) {
-        setConnectingFrom(null);
+      if (e.key === 'Escape') {
+        if (connectingFrom) setConnectingFrom(null);
+        if (reconnectingEdge) setReconnectingEdge(null);
         return;
       }
       if ((e.key === 'Delete' || e.key === 'Backspace') && !isReadOnly) {
-        // Ensure not typing in input or textarea
         if (
           document.activeElement?.tagName !== 'INPUT' &&
           document.activeElement?.tagName !== 'TEXTAREA'
         ) {
-          if (selectedNodeId || selectedEdgeId) {
+          if (effectiveSelectedNodeIds.length > 0 || selectedEdgeId) {
             e.preventDefault();
             onDeleteSelected();
           }
@@ -715,7 +866,12 @@ export const DiagramCanvas: React.FC<DiagramCanvasProps> = ({
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [selectedNodeId, selectedEdgeId, isReadOnly, onDeleteSelected, connectingFrom]);
+  }, [effectiveSelectedNodeIds, selectedEdgeId, isReadOnly, onDeleteSelected, connectingFrom, reconnectingEdge]);
+
+  // Determine active edge being reconnected for helper banners
+  const reconnectingEdgeObj = reconnectingEdge
+    ? edges.find(e => e.id === reconnectingEdge.edgeId)
+    : null;
 
   return (
     <div
@@ -780,8 +936,40 @@ export const DiagramCanvas: React.FC<DiagramCanvasProps> = ({
         </div>
       )}
 
-      {/* Floating Connector Style Switcher Quick Toolbar (Change 1) */}
-      {selectedEdge && !isReadOnly && (
+      {/* Floating Reconnection Instructions Banner (Change 1) */}
+      {reconnectingEdge && reconnectingEdgeObj && (
+        <div className="absolute top-4 left-1/2 -translate-x-1/2 z-40 bg-emerald-600 text-white px-4 py-2 rounded-xl shadow-2xl flex items-center gap-3 text-xs font-medium animate-in fade-in slide-in-from-top-3">
+          <div className="w-2.5 h-2.5 rounded-full bg-white animate-ping shrink-0" />
+          <span>
+            Moving connector {reconnectingEdge.endpoint === 'source' ? 'Start' : 'End'} point: Drag and drop onto any anchor point on a node
+          </span>
+          <button
+            onClick={() => setReconnectingEdge(null)}
+            className="ml-2 px-2.5 py-0.5 bg-emerald-800 hover:bg-emerald-900 text-white rounded text-[11px] font-mono cursor-pointer transition-colors"
+          >
+            Cancel (Esc)
+          </button>
+        </div>
+      )}
+
+      {/* Floating Multi-Node Selection Banner (Change 3) */}
+      {effectiveSelectedNodeIds.length > 1 && !connectingFrom && !reconnectingEdge && (
+        <div className="absolute top-4 left-1/2 -translate-x-1/2 z-30 bg-slate-900/90 border border-indigo-500/40 text-indigo-200 px-4 py-1.5 rounded-xl shadow-xl flex items-center gap-3 text-xs font-medium backdrop-blur-md animate-in fade-in slide-in-from-top-2">
+          <span className="w-2 h-2 rounded-full bg-indigo-400 shrink-0" />
+          <span>
+            <strong>{effectiveSelectedNodeIds.length}</strong> nodes selected — use Inspector to batch edit color & style
+          </span>
+          <button
+            onClick={() => onSelectNode(null)}
+            className="px-2 py-0.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded text-[10px] font-mono cursor-pointer"
+          >
+            Clear Selection
+          </button>
+        </div>
+      )}
+
+      {/* Floating Connector Style Switcher Quick Toolbar */}
+      {selectedEdge && !isReadOnly && !reconnectingEdge && (
         <div className={`absolute top-4 left-1/2 -translate-x-1/2 z-30 flex items-center gap-2 px-3 py-1.5 rounded-xl shadow-2xl backdrop-blur-md border animate-in fade-in slide-in-from-top-2 ${themeDef.panelClass}`}>
           <div className="flex items-center gap-1.5 pr-2 border-r border-slate-700/50">
             <span className={`text-[10px] font-mono font-semibold uppercase ${themeDef.textMutedClass}`}>
@@ -870,7 +1058,7 @@ export const DiagramCanvas: React.FC<DiagramCanvasProps> = ({
         </div>
       )}
 
-      {/* SVG Canvas Root for Lines, Connectors & Grid */}
+      {/* SVG Canvas Root for Lines, Connectors, Grid & Marquee Selection Box */}
       <svg
         id="canvas-background"
         className="absolute inset-0 w-full h-full pointer-events-auto"
@@ -1004,6 +1192,11 @@ export const DiagramCanvas: React.FC<DiagramCanvasProps> = ({
           const isEdgeConnected = activeFocusNodeId
             ? (edge.sourceNodeId === activeFocusNodeId || edge.targetNodeId === activeFocusNodeId)
             : true;
+
+          const isReconnectingThis = reconnectingEdge?.edgeId === edge.id;
+          const tempStart = isReconnectingThis && reconnectingEdge.endpoint === 'source' ? currentMousePos : null;
+          const tempEnd = isReconnectingThis && reconnectingEdge.endpoint === 'target' ? currentMousePos : null;
+
           return (
             <EdgeRenderer
               key={edge.id}
@@ -1014,11 +1207,14 @@ export const DiagramCanvas: React.FC<DiagramCanvasProps> = ({
               isDeemphasized={activeFocusNodeId ? !isEdgeConnected : false}
               onSelect={onSelectEdge}
               onContextMenu={handleEdgeContextMenu}
+              onStartReconnectEdge={handleStartReconnectEdge}
+              temporaryStart={tempStart}
+              temporaryEnd={tempEnd}
             />
           );
         })}
 
-        {/* Temporary Drawing Line while dragging connection handle */}
+        {/* Temporary Drawing Line while creating a new connection */}
         {connectingFrom && (
           <line
             x1={(() => {
@@ -1037,6 +1233,22 @@ export const DiagramCanvas: React.FC<DiagramCanvasProps> = ({
             markerEnd="url(#marker-arrow)"
           />
         )}
+
+        {/* Marquee Selection Rectangle (Change 3) */}
+        {marqueeBox && (
+          <rect
+            x={Math.min(marqueeBox.startX, marqueeBox.currentX)}
+            y={Math.min(marqueeBox.startY, marqueeBox.currentY)}
+            width={Math.abs(marqueeBox.currentX - marqueeBox.startX)}
+            height={Math.abs(marqueeBox.currentY - marqueeBox.startY)}
+            fill="rgba(56, 189, 248, 0.15)"
+            stroke="#38bdf8"
+            strokeWidth="1.5"
+            strokeDasharray="4 3"
+            rx={2}
+            className="pointer-events-none"
+          />
+        )}
       </svg>
 
       {/* HTML Layer for High-Fidelity Nodes */}
@@ -1049,11 +1261,19 @@ export const DiagramCanvas: React.FC<DiagramCanvasProps> = ({
       >
         {nodes.map(node => {
           const isNodeLinked = linkedNodeIds ? linkedNodeIds.has(node.id) : true;
+          const isNodeSelected = effectiveSelectedNodeIds.includes(node.id);
+
+          // For anchor candidate highlighting: active when creating new connection OR reconnecting existing edge
+          const isReconnectingThisEdge = reconnectingEdge !== null;
+          const reconnectingPinnedNodeId = reconnectingEdge
+            ? (reconnectingEdge.endpoint === 'source' ? reconnectingEdgeObj?.targetNodeId : reconnectingEdgeObj?.sourceNodeId)
+            : null;
+
           return (
             <NodeRenderer
               key={node.id}
               node={node}
-              isSelected={selectedNodeId === node.id}
+              isSelected={isNodeSelected}
               isDragging={draggingNodeId === node.id}
               collaborators={collaborators}
               isDeemphasized={linkedNodeIds ? !isNodeLinked : false}
@@ -1065,8 +1285,8 @@ export const DiagramCanvas: React.FC<DiagramCanvasProps> = ({
               onStartConnection={(nodeId, anchor) => {
                 setConnectingFrom({ nodeId, anchor });
               }}
-              isConnectingActive={!!connectingFrom}
-              connectingSourceNodeId={connectingFrom?.nodeId || null}
+              isConnectingActive={!!connectingFrom || isReconnectingThisEdge}
+              connectingSourceNodeId={connectingFrom?.nodeId || reconnectingPinnedNodeId || null}
               onCompleteConnection={handleCompleteConnection}
               onOpenDoc={onOpenDoc}
               onUpdateLabel={onUpdateNodeLabel}
@@ -1078,7 +1298,7 @@ export const DiagramCanvas: React.FC<DiagramCanvasProps> = ({
           );
         })}
 
-        {/* Real-Time Live Collaborator Cursors (Configured in Settings) */}
+        {/* Real-Time Live Collaborator Cursors */}
         {settings?.showCollaborators &&
           collaborators.map(c => {
             if (!c.cursorPosition) return null;
@@ -1098,66 +1318,24 @@ export const DiagramCanvas: React.FC<DiagramCanvasProps> = ({
                   className="mt-1 px-2 py-0.5 rounded text-[10px] font-semibold text-white whitespace-nowrap shadow-lg flex items-center gap-1.5"
                   style={{ backgroundColor: c.color }}
                 >
+                  <span className="w-1.5 h-1.5 rounded-full bg-white" />
                   <span>{c.name}</span>
-                  {c.lastAction && (
-                    <span className="opacity-80 font-normal">· {c.lastAction}</span>
-                  )}
                 </div>
               </div>
             );
           })}
       </div>
 
-      {/* Bottom-Right Minimap Indicator */}
-      <div className={`absolute bottom-4 right-4 z-30 rounded-lg p-2 shadow-xl backdrop-blur-md border hidden sm:block ${themeDef.panelClass}`}>
-        <div className="flex items-center gap-1.5 pb-1 text-[10px] font-mono text-slate-400">
-          <Compass className="w-3 h-3 text-blue-400" />
-          <span>MINIMAP</span>
-        </div>
-        <div
-          className="w-32 h-20 rounded relative overflow-hidden border"
-          style={{
-            backgroundColor: themeDef.canvasBg,
-            borderColor: themeDef.isDark ? '#334155' : '#cbd5e1',
-          }}
-        >
-          {nodes.map(n => (
-            <div
-              key={n.id}
-              className="absolute rounded-xs bg-blue-500/70"
-              style={{
-                left: `${Math.min(115, Math.max(2, (n.x / 1400) * 120))}px`,
-                top: `${Math.min(70, Math.max(2, (n.y / 900) * 75))}px`,
-                width: `${Math.max(4, (n.width / 1400) * 120)}px`,
-                height: `${Math.max(3, (n.height / 900) * 75)}px`,
-              }}
-            />
-          ))}
-          {/* Viewport boundary indicator */}
-          <div
-            className="absolute border border-emerald-400/80 bg-emerald-500/10 pointer-events-none rounded-xs"
-            style={{
-              left: `${Math.max(0, (-pan.x / (1400 * zoom)) * 120)}px`,
-              top: `${Math.max(0, (-pan.y / (900 * zoom)) * 75)}px`,
-              width: `${Math.min(120, (1000 / (1400 * zoom)) * 120)}px`,
-              height: `${Math.min(75, (700 / (900 * zoom)) * 75)}px`,
-            }}
-          />
-        </div>
-      </div>
-
-      {/* Right-Click Context Menu */}
+      {/* Context Menu for right click */}
       <ContextMenu
         position={contextMenu}
-        selectedNode={nodes.find(n => n.id === contextMenu?.nodeId) || null}
-        selectedEdge={edges.find(e => e.id === (contextMenu?.edgeId || selectedEdgeId)) || null}
+        selectedNode={contextMenu?.nodeId ? (nodes.find(n => n.id === contextMenu.nodeId) || null) : null}
+        selectedEdge={contextMenu?.edgeId ? (edges.find(e => e.id === contextMenu.edgeId) || null) : null}
         diagramType={diagramType}
-        onUpdateEdge={onUpdateEdge}
         otherNodes={nodes.filter(n => n.id !== contextMenu?.nodeId)}
         theme={theme}
         onClose={() => setContextMenu(null)}
         onDeleteNode={handleDeleteNode}
-        onDeleteEdge={onDeleteEdge}
         onDuplicateNode={handleDuplicateNode}
         onBringToFront={handleBringToFront}
         onSendToBack={handleSendToBack}
@@ -1166,6 +1344,8 @@ export const DiagramCanvas: React.FC<DiagramCanvasProps> = ({
         onQuickAddMethod={handleQuickAddMethod}
         onChangeColor={handleChangeColor}
         onOpenDoc={onOpenDoc}
+        onDeleteEdge={edgeId => onDeleteEdge?.(edgeId)}
+        onUpdateEdge={edge => onUpdateEdge?.(edge)}
         onResetZoom={() => {
           setZoom(1);
           setPan({ x: 0, y: 0 });

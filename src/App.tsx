@@ -57,8 +57,11 @@ export default function App() {
   // Current User Role (RBAC)
   const [userRole, setUserRole] = useState<UserRole>('admin');
 
-  // Canvas Selection
-  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
+  // Canvas Selection (Supports multi-node selection)
+  const [selectedNodeIds, setSelectedNodeIds] = useState<string[]>([]);
+  const setSelectedNodeId = useCallback((id: string | null) => {
+    setSelectedNodeIds(id ? [id] : []);
+  }, []);
   const [selectedEdgeId, setSelectedEdgeId] = useState<string | null>(null);
 
   // Inspector visibility
@@ -160,9 +163,11 @@ export default function App() {
     }
   }, [currentPage]);
 
-  // Selected node accessor
-  const selectedNode =
-    currentPage?.nodes.find(n => n.id === selectedNodeId) || null;
+  // Selected nodes accessors
+  const selectedNodes =
+    currentPage?.nodes.filter(n => selectedNodeIds.includes(n.id)) || [];
+  const selectedNode = selectedNodes.length === 1 ? selectedNodes[0] : null;
+  const selectedNodeId = selectedNodes.length === 1 ? selectedNodes[0].id : null;
 
   // Subscribe to offline sync & collaboration services
   useEffect(() => {
@@ -263,9 +268,27 @@ export default function App() {
           : page
       );
       persistDocument({ ...document, pages: updatedPages });
-      if (selectedNodeId === nodeId) setSelectedNodeId(null);
+      setSelectedNodeIds(prev => prev.filter(id => id !== nodeId));
     },
-    [document, currentPage, selectedNodeId, persistDocument]
+    [document, currentPage, persistDocument]
+  );
+
+  // Batch delete multiple nodes & connected edges (Change 3)
+  const handleDeleteNodes = useCallback(
+    (nodeIds: string[]) => {
+      const updatedNodes = currentPage.nodes.filter(n => !nodeIds.includes(n.id));
+      const updatedEdges = currentPage.edges.filter(
+        e => !nodeIds.includes(e.sourceNodeId) && !nodeIds.includes(e.targetNodeId)
+      );
+      const updatedPages = document.pages.map(page =>
+        page.id === currentPage.id
+          ? { ...page, nodes: updatedNodes, edges: updatedEdges }
+          : page
+      );
+      persistDocument({ ...document, pages: updatedPages });
+      setSelectedNodeIds(prev => prev.filter(id => !nodeIds.includes(id)));
+    },
+    [document, currentPage, persistDocument]
   );
 
   // Add edge connector
@@ -307,10 +330,10 @@ export default function App() {
     [document, currentPage, selectedEdgeId, persistDocument]
   );
 
-  // Delete selected element (node or edge)
+  // Delete selected element (nodes or edge)
   const handleDeleteSelected = useCallback(() => {
-    if (selectedNodeId) {
-      handleDeleteNode(selectedNodeId);
+    if (selectedNodeIds.length > 0) {
+      handleDeleteNodes(selectedNodeIds);
     } else if (selectedEdgeId) {
       const updatedEdges = currentPage.edges.filter(e => e.id !== selectedEdgeId);
       const updatedPages = document.pages.map(page =>
@@ -319,7 +342,7 @@ export default function App() {
       persistDocument({ ...document, pages: updatedPages });
       setSelectedEdgeId(null);
     }
-  }, [selectedNodeId, selectedEdgeId, currentPage, handleDeleteNode, document, persistDocument]);
+  }, [selectedNodeIds, selectedEdgeId, currentPage, handleDeleteNodes, document, persistDocument]);
 
   // Drop or add new shape from template
   const handleDropNewShape = useCallback(
@@ -1008,14 +1031,30 @@ export default function App() {
           edges={currentPage.edges}
           collaborators={collaborators}
           selectedNodeId={selectedNodeId}
+          selectedNodeIds={selectedNodeIds}
           selectedEdgeId={selectedEdgeId}
           userRole={userRole}
           theme={settings.theme}
           diagramType={currentPage.diagramType}
           settings={settings}
-          onSelectNode={nodeId => {
-            setSelectedNodeId(nodeId);
-            if (nodeId) {
+          onSelectNode={(nodeId, isMultiSelect) => {
+            if (nodeId === null) {
+              setSelectedNodeIds([]);
+              return;
+            }
+            if (isMultiSelect) {
+              setSelectedNodeIds(prev =>
+                prev.includes(nodeId) ? prev.filter(id => id !== nodeId) : [...prev, nodeId]
+              );
+            } else {
+              setSelectedNodeIds([nodeId]);
+            }
+            setSelectedEdgeId(null);
+            setIsInspectorOpen(true);
+          }}
+          onSelectMultipleNodes={nodeIds => {
+            setSelectedNodeIds(nodeIds);
+            if (nodeIds.length > 0) {
               setSelectedEdgeId(null);
               setIsInspectorOpen(true);
             }
@@ -1023,7 +1062,7 @@ export default function App() {
           onSelectEdge={edgeId => {
             setSelectedEdgeId(edgeId);
             if (edgeId) {
-              setSelectedNodeId(null);
+              setSelectedNodeIds([]);
               setIsInspectorOpen(true);
             }
           }}
@@ -1033,7 +1072,7 @@ export default function App() {
           onDeleteSelected={handleDeleteSelected}
           onDrillDown={handleDrillDown}
           onOpenDoc={node => {
-            setSelectedNodeId(node.id);
+            setSelectedNodeIds([node.id]);
             setIsInspectorOpen(true);
           }}
           onDropNewShape={handleDropNewShape}
@@ -1052,17 +1091,20 @@ export default function App() {
         />
 
         {/* Right Sidebar: Inspector, Documentation, Comments & Groups (Only displayed when a node or connector is selected) */}
-        {isInspectorOpen && (selectedNode || selectedEdgeId) && (
+        {isInspectorOpen && (selectedNodes.length > 0 || selectedEdgeId) && (
           <NodeInspector
             selectedNode={selectedNode}
+            selectedNodes={selectedNodes}
             selectedEdge={currentPage.edges.find(e => e.id === selectedEdgeId) || null}
             currentPage={currentPage}
             allPages={document.pages}
             userRole={userRole}
             theme={settings.theme}
             onUpdateNode={handleUpdateSingleNode}
+            onUpdateNodes={handleUpdateNodes}
             onUpdateEdge={handleUpdateEdge}
             onDeleteNode={handleDeleteNode}
+            onDeleteNodes={handleDeleteNodes}
             onDeleteEdge={handleDeleteEdge}
             onClose={() => setIsInspectorOpen(false)}
             onDrillDown={handleDrillDown}

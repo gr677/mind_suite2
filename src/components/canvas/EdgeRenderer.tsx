@@ -15,6 +15,9 @@ interface EdgeRendererProps {
   isDeemphasized?: boolean;
   onSelect?: (edgeId: string) => void;
   onContextMenu?: (edgeId: string, e: React.MouseEvent) => void;
+  onStartReconnectEdge?: (edgeId: string, endpoint: 'source' | 'target', e: React.MouseEvent) => void;
+  temporaryStart?: { x: number; y: number } | null;
+  temporaryEnd?: { x: number; y: number } | null;
 }
 
 export const EdgeRenderer: React.FC<EdgeRendererProps> = ({
@@ -25,11 +28,17 @@ export const EdgeRenderer: React.FC<EdgeRendererProps> = ({
   isDeemphasized = false,
   onSelect,
   onContextMenu,
+  onStartReconnectEdge,
+  temporaryStart,
+  temporaryEnd,
 }) => {
   if (!sourceNode || !targetNode) return null;
 
-  const start = getNodeAnchorCoords(sourceNode, edge.sourceAnchor);
-  const end = getNodeAnchorCoords(targetNode, edge.targetAnchor);
+  const defaultStart = getNodeAnchorCoords(sourceNode, edge.sourceAnchor);
+  const defaultEnd = getNodeAnchorCoords(targetNode, edge.targetAnchor);
+
+  const start = temporaryStart || defaultStart;
+  const end = temporaryEnd || defaultEnd;
 
   // Generate SVG path string based on edge type
   let pathD = '';
@@ -117,7 +126,7 @@ export const EdgeRenderer: React.FC<EdgeRendererProps> = ({
         }
       }}
     >
-      <title>{`Connector: ${sourceNode.label} → ${targetNode.label} (${styleLabel}) - Click to configure or right-click to flip style`}</title>
+      <title>{`Connector: ${sourceNode.label} → ${targetNode.label} (${styleLabel}) - Click to select, drag endpoint handles to move connector`}</title>
 
       {/* Invisible wider path for easier clicking/hover */}
       <path
@@ -176,6 +185,73 @@ export const EdgeRenderer: React.FC<EdgeRendererProps> = ({
           >
             {edge.label}
           </text>
+        </g>
+      )}
+
+      {/* Selected Edge Endpoint Drag Handles (Change 1)
+          Allows dragging this specific connector endpoint from one anchor point to another,
+          leaving any other connections at the same anchor point untouched! */}
+      {isSelected && (
+        <g className="pointer-events-auto">
+          {/* Source Endpoint Drag Handle (Start) */}
+          <g
+            className="cursor-grab active:cursor-grabbing group/handle"
+            transform={`translate(${start.x}, ${start.y})`}
+            onMouseDown={e => {
+              e.stopPropagation();
+              onStartReconnectEdge?.(edge.id, 'source', e);
+            }}
+          >
+            <title>{`Drag start point from "${sourceNode.label}" to another anchor point`}</title>
+            {/* Pulsing ring */}
+            <circle
+              r={11}
+              fill="rgba(56, 189, 248, 0.2)"
+              stroke="#38bdf8"
+              strokeWidth={1.5}
+              className="animate-ping origin-center"
+            />
+            {/* Outer handle ring */}
+            <circle
+              r={7}
+              fill="#0284c7"
+              stroke="#ffffff"
+              strokeWidth={2}
+              className="shadow-md transition-transform group-hover/handle:scale-125"
+            />
+            {/* Inner dot */}
+            <circle r={2.5} fill="#ffffff" />
+          </g>
+
+          {/* Target Endpoint Drag Handle (End) */}
+          <g
+            className="cursor-grab active:cursor-grabbing group/handle"
+            transform={`translate(${end.x}, ${end.y})`}
+            onMouseDown={e => {
+              e.stopPropagation();
+              onStartReconnectEdge?.(edge.id, 'target', e);
+            }}
+          >
+            <title>{`Drag end point from "${targetNode.label}" to another anchor point`}</title>
+            {/* Pulsing ring */}
+            <circle
+              r={11}
+              fill="rgba(52, 211, 153, 0.2)"
+              stroke="#34d399"
+              strokeWidth={1.5}
+              className="animate-ping origin-center"
+            />
+            {/* Outer handle ring */}
+            <circle
+              r={7}
+              fill="#10b981"
+              stroke="#ffffff"
+              strokeWidth={2}
+              className="shadow-md transition-transform group-hover/handle:scale-125"
+            />
+            {/* Inner dot */}
+            <circle r={2.5} fill="#ffffff" />
+          </g>
         </g>
       )}
     </g>

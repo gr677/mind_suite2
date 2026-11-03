@@ -118,11 +118,11 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
         <div className={`flex items-center gap-2.5 pr-3 border-r shrink-0 ${isDark ? 'border-slate-800' : 'border-slate-200'}`}>
           <img
             src="/assets/aistudio/brain_transparent.png"
-            alt="OmniModel Studio"
+            alt="MODEL MANAGER"
             className="w-9 h-9 object-contain drop-shadow-md hover:scale-105 transition-transform"
           />
           <div>
-            <h1 className={`text-xs font-bold tracking-wide uppercase ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>OmniModel Studio</h1>
+            <h1 className={`text-xs font-bold tracking-wide uppercase ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>MODEL MANAGER</h1>
             <p className={`text-[9px] font-mono ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Enterprise Architecture Suite</p>
           </div>
         </div>

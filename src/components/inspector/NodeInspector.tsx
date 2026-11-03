@@ -61,14 +61,17 @@ import {
 
 interface NodeInspectorProps {
   selectedNode: DiagramNode | null;
+  selectedNodes?: DiagramNode[];
   selectedEdge?: DiagramEdge | null;
   currentPage: DiagramPage;
   allPages: DiagramPage[];
   userRole: UserRole;
   theme?: AppTheme;
   onUpdateNode: (updatedNode: DiagramNode) => void;
+  onUpdateNodes?: (updatedNodes: DiagramNode[]) => void;
   onUpdateEdge?: (updatedEdge: DiagramEdge) => void;
   onDeleteNode: (nodeId: string) => void;
+  onDeleteNodes?: (nodeIds: string[]) => void;
   onDeleteEdge?: (edgeId: string) => void;
   onClose: () => void;
   onDrillDown?: (pageId: string) => void;
@@ -79,14 +82,17 @@ interface NodeInspectorProps {
 
 export const NodeInspector: React.FC<NodeInspectorProps> = ({
   selectedNode,
+  selectedNodes,
   selectedEdge,
   currentPage,
   allPages,
   userRole,
   theme = 'dark',
   onUpdateNode,
+  onUpdateNodes,
   onUpdateEdge,
   onDeleteNode,
+  onDeleteNodes,
   onDeleteEdge,
   onClose,
   onDrillDown,
@@ -417,6 +423,439 @@ export const NodeInspector: React.FC<NodeInspectorProps> = ({
               >
                 <Trash2 className="w-4 h-4" />
                 <span>Delete Connector</span>
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // Multi-Node Selection Inspector View (Change 3)
+  if (selectedNodes && selectedNodes.length > 1) {
+    const isReadOnly = userRole === 'viewer';
+
+    const batchUpdateSelectedNodes = (updater: (node: DiagramNode) => DiagramNode) => {
+      const updated = currentPage.nodes.map(n => {
+        if (selectedNodes.some(sn => sn.id === n.id)) {
+          return updater(n);
+        }
+        return n;
+      });
+      if (onUpdateNodes) {
+        onUpdateNodes(updated);
+      } else {
+        selectedNodes.forEach(sn => onUpdateNode(updater(sn)));
+      }
+    };
+
+    const anyGradient = selectedNodes.some(n => n.style?.gradient);
+
+    return (
+      <div className={`w-80 h-full border-l flex flex-col select-none transition-colors duration-150 ${themeDef.sidebarClass}`}>
+        {/* Header */}
+        <div className={`p-3.5 border-b flex items-center justify-between ${themeDef.isDark ? 'border-slate-800' : 'border-slate-200'}`}>
+          <div className="flex items-center gap-2">
+            <Layers className="w-4 h-4 text-indigo-400" />
+            <div>
+              <h3 className={`text-xs font-bold uppercase tracking-wider ${themeDef.isDark ? 'text-slate-100' : 'text-slate-900'}`}>
+                Multi-Selection
+              </h3>
+              <p className="text-[10px] text-slate-400 font-mono">
+                {selectedNodes.length} nodes selected
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className={`p-1 rounded cursor-pointer transition-colors ${
+              themeDef.isDark
+                ? 'hover:bg-slate-800 text-slate-400 hover:text-slate-200'
+                : 'hover:bg-slate-100 text-slate-500 hover:text-slate-800'
+            }`}
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        {/* Scrollable Content */}
+        <div className="flex-1 overflow-y-auto p-4 space-y-4">
+          {/* Selected Nodes Tag List */}
+          <div className="p-2.5 rounded-lg border border-indigo-500/20 bg-indigo-950/20 space-y-1.5">
+            <div className="text-[10px] font-mono text-indigo-300 font-semibold uppercase tracking-wider flex items-center justify-between">
+              <span>Selected Entities</span>
+              <span className="px-1.5 py-0.2 bg-indigo-500/30 rounded text-[9px]">{selectedNodes.length}</span>
+            </div>
+            <div className="flex flex-wrap gap-1 max-h-24 overflow-y-auto">
+              {selectedNodes.map(n => (
+                <span
+                  key={n.id}
+                  className="px-2 py-0.5 rounded text-[10px] font-mono bg-slate-800 border border-slate-700 text-slate-200 truncate max-w-[120px]"
+                  title={n.label}
+                >
+                  {n.label}
+                </span>
+              ))}
+            </div>
+          </div>
+
+          {/* Color Palettes */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-mono text-slate-400 font-semibold uppercase">Batch Color Palette</span>
+              <div className="flex items-center bg-slate-950 p-0.5 rounded-lg border border-slate-800 text-[9px] font-mono">
+                <button
+                  type="button"
+                  onClick={() => setPaletteCategory('pastel')}
+                  className={`px-2 py-0.5 rounded-md transition-colors cursor-pointer ${
+                    paletteCategory === 'pastel'
+                      ? 'bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/40'
+                      : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  Pastels (12)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPaletteCategory('vibrant')}
+                  className={`px-2 py-0.5 rounded-md transition-colors cursor-pointer ${
+                    paletteCategory === 'vibrant'
+                      ? 'bg-blue-500/20 text-blue-300 font-bold border border-blue-500/40'
+                      : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  Vibrant (12)
+                </button>
+              </div>
+            </div>
+
+            {/* Swatch Grid */}
+            <div className="grid grid-cols-4 gap-1.5 max-h-36 overflow-y-auto pr-0.5">
+              {(paletteCategory === 'pastel' ? PASTEL_COLOR_PALETTES : VIBRANT_COLOR_PALETTES).map(p => (
+                <button
+                  key={p.id}
+                  type="button"
+                  disabled={isReadOnly}
+                  onClick={() => {
+                    batchUpdateSelectedNodes(n => ({
+                      ...n,
+                      style: {
+                        ...n.style,
+                        fill: p.fill,
+                        stroke: p.stroke,
+                        textColor: p.textColor,
+                      },
+                    }));
+                  }}
+                  className="p-1 rounded-md border border-slate-700/80 hover:scale-105 transition-all flex items-center gap-1 text-left cursor-pointer shadow-xs group"
+                  style={{ backgroundColor: p.fill }}
+                  title={`Apply ${p.name} to all ${selectedNodes.length} selected nodes`}
+                >
+                  <div
+                    className="w-2.5 h-2.5 rounded-full shrink-0 border border-black/20"
+                    style={{ backgroundColor: p.stroke }}
+                  />
+                  <span
+                    className="text-[9px] font-semibold truncate leading-none"
+                    style={{ color: p.textColor }}
+                  >
+                    {p.name.replace('Pastel ', '')}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Gradual Darkening Fill */}
+          <div>
+            <button
+              type="button"
+              disabled={isReadOnly}
+              onClick={() => {
+                batchUpdateSelectedNodes(n => ({
+                  ...n,
+                  style: {
+                    ...n.style,
+                    gradient: !anyGradient,
+                  },
+                }));
+              }}
+              className={`w-full p-2 rounded-lg border text-left transition-all cursor-pointer flex items-center justify-between ${
+                anyGradient
+                  ? 'border-indigo-500 bg-indigo-500/20 text-indigo-200 ring-1 ring-indigo-500/50'
+                  : 'border-slate-800 bg-slate-950 hover:border-slate-700 text-slate-300'
+              }`}
+              title="Apply gradual darkening gradient to all selected nodes"
+            >
+              <div className="flex items-center gap-2">
+                <div
+                  className="w-5 h-5 rounded border border-white/20 shadow-sm shrink-0"
+                  style={{ background: 'linear-gradient(180deg, #38bdf8 0%, #0369a1 100%)' }}
+                />
+                <div>
+                  <div className="font-semibold text-xs text-slate-100">Gradual Darkening Fill</div>
+                  <div className="text-[10px] text-slate-400">Darken all selected nodes toward bottom</div>
+                </div>
+              </div>
+              <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold ${
+                anyGradient ? 'bg-indigo-500 text-white' : 'bg-slate-800 text-slate-400'
+              }`}>
+                {anyGradient ? 'ON' : 'OFF'}
+              </span>
+            </button>
+          </div>
+
+          {/* Custom Color Pickers */}
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className="text-[10px] text-slate-400 block mb-1">Fill Color</label>
+              <div className="flex items-center gap-1.5 bg-slate-950 border border-slate-800 rounded p-1">
+                <input
+                  type="color"
+                  disabled={isReadOnly}
+                  value={selectedNodes[0].style?.fill?.startsWith('#') ? selectedNodes[0].style.fill : '#1e293b'}
+                  onChange={e => {
+                    const newFill = e.target.value;
+                    batchUpdateSelectedNodes(n => ({
+                      ...n,
+                      style: { ...n.style, fill: newFill },
+                    }));
+                  }}
+                  className="w-5 h-5 rounded cursor-pointer border-0 p-0 bg-transparent"
+                />
+                <input
+                  type="text"
+                  disabled={isReadOnly}
+                  placeholder="#1e293b"
+                  value={selectedNodes[0].style?.fill || ''}
+                  onChange={e => {
+                    const newFill = e.target.value;
+                    batchUpdateSelectedNodes(n => ({
+                      ...n,
+                      style: { ...n.style, fill: newFill },
+                    }));
+                  }}
+                  className="w-full bg-transparent text-[11px] font-mono text-slate-200 focus:outline-none"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="text-[10px] text-slate-400 block mb-1">Border Color</label>
+              <div className="flex items-center gap-1.5 bg-slate-950 border border-slate-800 rounded p-1">
+                <input
+                  type="color"
+                  disabled={isReadOnly}
+                  value={selectedNodes[0].style?.stroke?.startsWith('#') ? selectedNodes[0].style.stroke : '#0284c7'}
+                  onChange={e => {
+                    const newStroke = e.target.value;
+                    batchUpdateSelectedNodes(n => ({
+                      ...n,
+                      style: { ...n.style, stroke: newStroke },
+                    }));
+                  }}
+                  className="w-5 h-5 rounded cursor-pointer border-0 p-0 bg-transparent"
+                />
+                <input
+                  type="text"
+                  disabled={isReadOnly}
+                  placeholder="#0284c7"
+                  value={selectedNodes[0].style?.stroke || ''}
+                  onChange={e => {
+                    const newStroke = e.target.value;
+                    batchUpdateSelectedNodes(n => ({
+                      ...n,
+                      style: { ...n.style, stroke: newStroke },
+                    }));
+                  }}
+                  className="w-full bg-transparent text-[11px] font-mono text-slate-200 focus:outline-none"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Border Width & Style */}
+          <div className="space-y-2">
+            <div>
+              <label className="text-[10px] text-slate-400 block mb-1">Border Width</label>
+              <div className="grid grid-cols-3 gap-1.5">
+                {[1, 2, 4].map(w => (
+                  <button
+                    key={w}
+                    type="button"
+                    disabled={isReadOnly}
+                    onClick={() => {
+                      batchUpdateSelectedNodes(n => ({
+                        ...n,
+                        style: { ...n.style, strokeWidth: w },
+                      }));
+                    }}
+                    className={`py-1 text-xs font-mono rounded border cursor-pointer transition-colors ${
+                      (selectedNodes[0].style?.strokeWidth || 2) === w
+                        ? 'bg-sky-500/20 border-sky-500 text-sky-300 font-bold'
+                        : 'bg-slate-950 border-slate-800 hover:border-slate-700 text-slate-400'
+                    }`}
+                  >
+                    {w}px
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <label className="text-[10px] text-slate-400 block mb-1">Border Style</label>
+              <div className="grid grid-cols-3 gap-1.5">
+                {[
+                  { id: 'solid', label: 'Solid', dash: undefined },
+                  { id: 'dashed', label: 'Dashed', dash: '5 5' },
+                  { id: 'dotted', label: 'Dotted', dash: '2 2' },
+                ].map(s => (
+                  <button
+                    key={s.id}
+                    type="button"
+                    disabled={isReadOnly}
+                    onClick={() => {
+                      batchUpdateSelectedNodes(n => ({
+                        ...n,
+                        style: { ...n.style, strokeDasharray: s.dash },
+                      }));
+                    }}
+                    className={`py-1 text-xs rounded border cursor-pointer transition-colors ${
+                      (selectedNodes[0].style?.strokeDasharray || undefined) === s.dash
+                        ? 'bg-sky-500/20 border-sky-500 text-sky-300 font-bold'
+                        : 'bg-slate-950 border-slate-800 hover:border-slate-700 text-slate-400'
+                    }`}
+                  >
+                    {s.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Reset Style Button */}
+          <div>
+            <button
+              type="button"
+              disabled={isReadOnly}
+              onClick={() => {
+                batchUpdateSelectedNodes(n => ({
+                  ...n,
+                  style: {
+                    ...n.style,
+                    fill: undefined,
+                    stroke: undefined,
+                    textColor: undefined,
+                    gradient: undefined,
+                    strokeWidth: undefined,
+                    strokeDasharray: undefined,
+                  },
+                }));
+              }}
+              className="w-full py-1.5 px-3 rounded-lg border border-slate-800 bg-slate-950 hover:bg-slate-900 text-slate-400 hover:text-slate-200 text-xs font-mono flex items-center justify-center gap-1.5 cursor-pointer transition-colors"
+            >
+              <RotateCcw className="w-3.5 h-3.5" />
+              <span>Reset Default Colors ({selectedNodes.length} Nodes)</span>
+            </button>
+          </div>
+
+          {/* Alignment Tools */}
+          <div className="p-3 rounded-xl border border-slate-800 bg-slate-950/60 space-y-2">
+            <span className="text-[10px] font-mono text-slate-400 font-semibold uppercase block">
+              Align Selected Nodes
+            </span>
+            <div className="grid grid-cols-3 gap-1.5 text-[11px] font-mono">
+              <button
+                type="button"
+                disabled={isReadOnly}
+                onClick={() => {
+                  const minX = Math.min(...selectedNodes.map(n => n.x));
+                  batchUpdateSelectedNodes(n => ({ ...n, x: minX }));
+                }}
+                className="py-1 px-1.5 rounded bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 text-center cursor-pointer transition-colors"
+                title="Align all selected nodes to left edge"
+              >
+                Align Left
+              </button>
+              <button
+                type="button"
+                disabled={isReadOnly}
+                onClick={() => {
+                  const avgX = selectedNodes.reduce((acc, n) => acc + n.x + n.width / 2, 0) / selectedNodes.length;
+                  batchUpdateSelectedNodes(n => ({ ...n, x: Math.round(avgX - n.width / 2) }));
+                }}
+                className="py-1 px-1.5 rounded bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 text-center cursor-pointer transition-colors"
+                title="Align all selected nodes to center horizontally"
+              >
+                Center X
+              </button>
+              <button
+                type="button"
+                disabled={isReadOnly}
+                onClick={() => {
+                  const maxRight = Math.max(...selectedNodes.map(n => n.x + n.width));
+                  batchUpdateSelectedNodes(n => ({ ...n, x: maxRight - n.width }));
+                }}
+                className="py-1 px-1.5 rounded bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 text-center cursor-pointer transition-colors"
+                title="Align all selected nodes to right edge"
+              >
+                Align Right
+              </button>
+              <button
+                type="button"
+                disabled={isReadOnly}
+                onClick={() => {
+                  const minY = Math.min(...selectedNodes.map(n => n.y));
+                  batchUpdateSelectedNodes(n => ({ ...n, y: minY }));
+                }}
+                className="py-1 px-1.5 rounded bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 text-center cursor-pointer transition-colors"
+                title="Align all selected nodes to top edge"
+              >
+                Align Top
+              </button>
+              <button
+                type="button"
+                disabled={isReadOnly}
+                onClick={() => {
+                  const avgY = selectedNodes.reduce((acc, n) => acc + n.y + n.height / 2, 0) / selectedNodes.length;
+                  batchUpdateSelectedNodes(n => ({ ...n, y: Math.round(avgY - n.height / 2) }));
+                }}
+                className="py-1 px-1.5 rounded bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 text-center cursor-pointer transition-colors"
+                title="Align all selected nodes to center vertically"
+              >
+                Center Y
+              </button>
+              <button
+                type="button"
+                disabled={isReadOnly}
+                onClick={() => {
+                  const maxBottom = Math.max(...selectedNodes.map(n => n.y + n.height));
+                  batchUpdateSelectedNodes(n => ({ ...n, y: maxBottom - n.height }));
+                }}
+                className="py-1 px-1.5 rounded bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 text-center cursor-pointer transition-colors"
+                title="Align all selected nodes to bottom edge"
+              >
+                Align Bottom
+              </button>
+            </div>
+          </div>
+
+          {/* Delete Batch Button */}
+          {!isReadOnly && (
+            <div className="pt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  if (onDeleteNodes) {
+                    onDeleteNodes(selectedNodes.map(n => n.id));
+                  } else {
+                    selectedNodes.forEach(n => onDeleteNode(n.id));
+                  }
+                }}
+                className="w-full py-2 px-3 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 cursor-pointer transition-colors"
+              >
+                <Trash2 className="w-4 h-4" />
+                <span>Delete Selected ({selectedNodes.length} Nodes)</span>
               </button>
             </div>
           )}

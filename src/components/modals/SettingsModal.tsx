@@ -292,7 +292,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               <div className="p-4 rounded-xl border border-emerald-500/30 bg-emerald-950/20 space-y-3">
                 <div className="flex items-center gap-2 text-emerald-400 font-semibold text-sm">
                   <Info className="w-4 h-4" />
-                  <span>How Diagram Saving Works in OmniModel</span>
+                  <span>How Diagram Saving Works in Model Manager</span>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs leading-relaxed">
                   <div className="p-3 rounded-lg bg-black/25 border border-emerald-500/20 space-y-1">
