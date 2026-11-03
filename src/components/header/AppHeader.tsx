@@ -34,6 +34,7 @@ import {
   Brain,
   MoreHorizontal,
   Wrench,
+  Database,
 } from 'lucide-react';
 import { THEMES } from '../../utils/themeConfig';
 import { workspaceService } from '../../services/workspaceService';
@@ -54,6 +55,7 @@ interface AppHeaderProps {
   onSwitchDiagram?: (filename: string) => void;
   onOpenWorkspaceModal: () => void;
   onOpenSettingsModal: () => void;
+  onOpenImportSqlModal?: () => void;
   onManualSave: () => void;
   onSelectPage: (pageId: string) => void;
   onOpenNewPageModal: () => void;
@@ -81,6 +83,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
   onNavigateBack,
   onOpenWorkspaceModal,
   onOpenSettingsModal,
+  onOpenImportSqlModal,
   onManualSave,
   onSelectPage,
   onOpenNewPageModal,
@@ -216,6 +219,19 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
 
       {/* Right: Gallery, Tools Menu, Settings & Theme */}
       <div className="flex items-center gap-2">
+        {/* Dedicated ERD SQL Import Button (Visible when on an ERD diagram) */}
+        {currentPage.diagramType === 'erd' && onOpenImportSqlModal && (
+          <button
+            onClick={onOpenImportSqlModal}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-sky-600 hover:bg-sky-500 text-white rounded-lg text-xs font-bold cursor-pointer transition-all shadow-md shadow-sky-600/30 shrink-0 animate-in fade-in"
+            title="Upload ERwin PostgreSQL SQL file (.sql) to populate tables & relationships"
+          >
+            <Database className="w-3.5 h-3.5" />
+            <span>Import SQL</span>
+            <span className="text-[9px] font-mono px-1 py-0.2 rounded bg-black/25">ERwin</span>
+          </button>
+        )}
+
         {/* Diagram Types Catalog Launcher */}
         <button
           onClick={onOpenGallery}
@@ -315,6 +331,26 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
                 </div>
                 <span className="text-[9px] font-mono px-1.5 py-0.2 bg-emerald-500/10 text-emerald-400 rounded">REST</span>
               </button>
+
+              {/* Import SQL (ERwin / PostgreSQL) */}
+              {onOpenImportSqlModal && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsToolsDropdownOpen(false);
+                    onOpenImportSqlModal();
+                  }}
+                  className={`w-full text-left px-2.5 py-2 rounded-lg flex items-center justify-between transition-colors cursor-pointer ${
+                    isDark ? 'hover:bg-slate-800 text-slate-200' : 'hover:bg-slate-100 text-slate-800'
+                  }`}
+                >
+                  <div className="flex items-center gap-2">
+                    <Database className="w-3.5 h-3.5 text-sky-400" />
+                    <span>Import SQL (ERwin/Postgres)</span>
+                  </div>
+                  <span className="text-[9px] font-mono px-1.5 py-0.2 bg-sky-500/15 text-sky-400 rounded">SQL</span>
+                </button>
+              )}
 
               {/* GitHub Publish */}
               <button

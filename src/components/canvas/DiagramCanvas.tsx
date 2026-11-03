@@ -23,6 +23,8 @@ import {
   Spline,
   Minus,
   RotateCcw,
+  Database,
+  Upload,
 } from 'lucide-react';
 
 import { ContextMenu, ContextMenuPosition } from './ContextMenu';
@@ -45,7 +47,7 @@ interface DiagramCanvasProps {
   userRole: UserRole;
   theme: AppTheme;
   diagramType?: DiagramType;
-  settings?: StudioSettings;
+  settings: StudioSettings;
   pageId?: string;
   activeDiagramFilename?: string;
   onSelectNode: (nodeId: string | null) => void;
@@ -63,6 +65,7 @@ interface DiagramCanvasProps {
   onOpenSettingsModal?: () => void;
   onOpenChildDiagramModal?: (node: DiagramNode) => void;
   onNavigateChildDiagram?: (filename: string) => void;
+  onOpenImportSqlModal?: () => void;
 }
 
 export const DiagramCanvas: React.FC<DiagramCanvasProps> = ({
@@ -92,6 +95,7 @@ export const DiagramCanvas: React.FC<DiagramCanvasProps> = ({
   onOpenSettingsModal,
   onOpenChildDiagramModal,
   onNavigateChildDiagram,
+  onOpenImportSqlModal,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const themeDef = THEMES[theme] || THEMES.dark;
@@ -727,6 +731,37 @@ export const DiagramCanvas: React.FC<DiagramCanvasProps> = ({
       onDrop={handleDrop}
       onContextMenu={handleCanvasContextMenu}
     >
+      {/* Empty ERD Canvas State with Instant SQL Import CTA */}
+      {nodes.length === 0 && diagramType === 'erd' && (
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10 p-6">
+          <div
+            className={`max-w-md w-full p-6 rounded-2xl border text-center shadow-2xl pointer-events-auto backdrop-blur-md animate-in fade-in zoom-in-95 ${
+              themeDef.isDark
+                ? 'bg-slate-900/95 border-slate-700/80 text-slate-100 shadow-sky-950/30'
+                : 'bg-white/95 border-slate-200 text-slate-800 shadow-slate-200'
+            }`}
+          >
+            <div className="w-12 h-12 mx-auto rounded-xl bg-sky-500/15 border border-sky-500/30 text-sky-400 flex items-center justify-center mb-3">
+              <Database className="w-6 h-6" />
+            </div>
+            <h3 className="text-sm font-bold tracking-tight mb-1">Entity Relationship Diagram (ERD)</h3>
+            <p className={`text-xs mb-4 leading-relaxed ${themeDef.isDark ? 'text-slate-400' : 'text-slate-600'}`}>
+              Populate this ERD with entity tables, primary keys, and foreign key relationships directly from an ERwin PostgreSQL SQL export, or drag shapes from the left palette.
+            </p>
+            {onOpenImportSqlModal && (
+              <button
+                type="button"
+                onClick={onOpenImportSqlModal}
+                className="w-full py-2.5 px-4 bg-sky-600 hover:bg-sky-500 text-white rounded-xl text-xs font-semibold cursor-pointer transition-all shadow-md shadow-sky-600/30 flex items-center justify-center gap-2"
+              >
+                <Upload className="w-4 h-4" />
+                <span>Upload ERwin PostgreSQL SQL (.sql)</span>
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Floating Connecting Instructions Banner */}
       {connectingFrom && (
         <div className="absolute top-4 left-1/2 -translate-x-1/2 z-40 bg-blue-600 text-white px-4 py-2 rounded-xl shadow-2xl flex items-center gap-3 text-xs font-medium animate-in fade-in slide-in-from-top-3">
@@ -1144,6 +1179,7 @@ export const DiagramCanvas: React.FC<DiagramCanvasProps> = ({
         onConnectNodes={handleConnectDirect}
         onNavigateChildDiagram={onNavigateChildDiagram}
         onOpenChildDiagramModal={onOpenChildDiagramModal}
+        onOpenImportSqlModal={onOpenImportSqlModal}
         isReadOnly={isReadOnly}
       />
 

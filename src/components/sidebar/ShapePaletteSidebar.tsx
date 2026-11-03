@@ -37,7 +37,7 @@ import { THEMES } from '../../utils/themeConfig';
 import { WorkspaceDropdown } from './WorkspaceDropdown';
 import { DiagramDocument } from '../../types/diagram';
 import { workspaceService } from '../../services/workspaceService';
-import { ArrowLeft, FolderTree, FileCode, Check } from 'lucide-react';
+import { ArrowLeft, FolderTree, FileCode, Check, Upload } from 'lucide-react';
 
 interface ShapePaletteSidebarProps {
   currentDiagramType: DiagramType;
@@ -51,6 +51,7 @@ interface ShapePaletteSidebarProps {
   onSelectCategory: (cat: string) => void;
   onSelectTemplate: (templateId: string) => void;
   onOpenGallery: () => void;
+  onOpenImportSqlModal?: () => void;
   onLoadDiagram?: (doc: DiagramDocument) => void;
 }
 
@@ -66,6 +67,7 @@ export const ShapePaletteSidebar: React.FC<ShapePaletteSidebarProps> = ({
   onSelectCategory,
   onSelectTemplate,
   onOpenGallery,
+  onOpenImportSqlModal,
   onLoadDiagram,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
@@ -292,6 +294,38 @@ export const ShapePaletteSidebar: React.FC<ShapePaletteSidebarProps> = ({
 
       {/* Shapes list */}
       <div className="flex-1 overflow-y-auto p-2.5 space-y-2">
+        {/* ERD SQL Import Card (When on an ERD diagram or ERD filter) */}
+        {(currentDiagramType === 'erd' || selectedCategory === 'erd') && onOpenImportSqlModal && (
+          <div
+            className={`p-2.5 rounded-xl border mb-1.5 transition-all shadow-xs ${
+              themeDef.isDark
+                ? 'bg-sky-950/40 border-sky-500/30 text-sky-200'
+                : 'bg-sky-50 border-sky-200 text-sky-900'
+            }`}
+          >
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-[10px] font-mono uppercase font-bold text-sky-400 flex items-center gap-1.5">
+                <Database className="w-3.5 h-3.5 text-sky-400" />
+                ERwin SQL Import
+              </span>
+              <span className="text-[9px] font-mono px-1.5 py-0.2 rounded bg-sky-500/20 text-sky-300 font-semibold">
+                PostgreSQL
+              </span>
+            </div>
+            <p className="text-[10px] leading-relaxed opacity-75 mb-2">
+              Upload ERwin PostgreSQL DDL (.sql) to automatically populate entity tables &amp; foreign keys.
+            </p>
+            <button
+              type="button"
+              onClick={onOpenImportSqlModal}
+              className="w-full py-1.5 px-2 bg-sky-600 hover:bg-sky-500 text-white rounded-lg text-xs font-semibold cursor-pointer transition-all flex items-center justify-center gap-1.5 shadow-sm shadow-sky-600/30"
+            >
+              <Upload className="w-3.5 h-3.5" />
+              <span>Import SQL File</span>
+            </button>
+          </div>
+        )}
+
         <div className="flex items-center justify-between px-1 text-[10px] font-mono text-slate-400">
           <span>{filteredTemplates.length} SHAPES AVAILABLE</span>
           {selectedCategory !== 'all' && (

@@ -36,6 +36,7 @@ import { WorkspaceModal } from './components/modals/WorkspaceModal';
 import { SettingsModal } from './components/modals/SettingsModal';
 import { CreateChildDiagramModal } from './components/modals/CreateChildDiagramModal';
 import { SaveSuccessModal } from './components/modals/SaveSuccessModal';
+import { ImportSqlModal } from './components/modals/ImportSqlModal';
 import { workspaceService } from './services/workspaceService';
 import { getExampleDiagramForType } from './data/diagramExamples';
 import { THEMES } from './utils/themeConfig';
@@ -75,6 +76,7 @@ export default function App() {
   const [isWorkspaceModalOpen, setIsWorkspaceModalOpen] = useState(false);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   const [isSaveSuccessModalOpen, setIsSaveSuccessModalOpen] = useState(false);
+  const [isImportSqlModalOpen, setIsImportSqlModalOpen] = useState(false);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'unsaved'>('idle');
   const [activeWs, setActiveWs] = useState(() => workspaceService.getActiveWorkspace());
   const [childModalNode, setChildModalNode] = useState<DiagramNode | null>(null);
@@ -396,6 +398,91 @@ export default function App() {
       persistDocument(updatedDoc);
     },
     [document, persistDocument]
+  );
+
+  // Import ERD from SQL file (ERwin / PostgreSQL DDL)
+  const handleImportErd = useCallback(
+    (
+      importedNodes: DiagramNode[],
+      importedEdges: DiagramEdge[],
+      mode: 'replace' | 'append' | 'new_page',
+      newPageTitle?: string
+    ) => {
+      if (mode === 'new_page') {
+        const pageTitle = newPageTitle?.trim() || 'PostgreSQL ERD';
+        const newPage: DiagramPage = {
+          id: `page-${Date.now()}`,
+          title: pageTitle,
+          diagramType: 'erd',
+          nodes: importedNodes,
+          edges: importedEdges,
+          viewport: { x: 50, y: 50, zoom: 1 },
+        };
+        const updatedDoc = {
+          ...document,
+          pages: [...document.pages, newPage],
+          activePageId: newPage.id,
+        };
+        setActivePageId(newPage.id);
+        setSelectedCategory('erd');
+        persistDocument(updatedDoc);
+        collaborationService.addActivity(
+          'You',
+          '#0284c7',
+          `Created ERD page "${pageTitle}" with ${importedNodes.length} tables from SQL`
+        );
+        return;
+      }
+
+      if (mode === 'replace') {
+        const updatedPages = document.pages.map(page =>
+          page.id === currentPage.id
+            ? {
+                ...page,
+                diagramType: 'erd' as DiagramType,
+                nodes: importedNodes,
+                edges: importedEdges,
+              }
+            : page
+        );
+        persistDocument({ ...document, pages: updatedPages });
+        setSelectedCategory('erd');
+        collaborationService.addActivity(
+          'You',
+          '#0284c7',
+          `Replaced ERD with ${importedNodes.length} tables from ERwin PostgreSQL SQL`
+        );
+        return;
+      }
+
+      if (mode === 'append') {
+        let maxBottomY = 0;
+        for (const n of currentPage.nodes) {
+          if (n.y + n.height > maxBottomY) maxBottomY = n.y + n.height;
+        }
+        const offsetY = maxBottomY > 0 ? maxBottomY + 80 : 0;
+        const shiftedNodes = importedNodes.map(n => ({
+          ...n,
+          y: n.y + offsetY,
+        }));
+        const updatedPages = document.pages.map(page =>
+          page.id === currentPage.id
+            ? {
+                ...page,
+                nodes: [...page.nodes, ...shiftedNodes],
+                edges: [...page.edges, ...importedEdges],
+              }
+            : page
+        );
+        persistDocument({ ...document, pages: updatedPages });
+        collaborationService.addActivity(
+          'You',
+          '#0284c7',
+          `Appended ${importedNodes.length} tables from ERwin PostgreSQL SQL`
+        );
+      }
+    },
+    [document, currentPage, persistDocument]
   );
 
   // Flip between diagram types: Show last one open, or generate starter example!
@@ -884,6 +971,7 @@ export default function App() {
         onOpenVersionsModal={() => setIsVersionsModalOpen(true)}
         onOpenRestApiModal={() => setIsRestApiModalOpen(true)}
         onOpenOfflineModal={() => setIsOfflineModalOpen(true)}
+        onOpenImportSqlModal={() => setIsImportSqlModalOpen(true)}
         onChangeRole={setUserRole}
         onToggleTheme={handleToggleTheme}
         onSwitchDiagram={handleSwitchDiagram}
@@ -908,6 +996,7 @@ export default function App() {
             handleDropNewShape(templateId, 240, 200);
           }}
           onOpenGallery={() => setIsGalleryOpen(true)}
+          onOpenImportSqlModal={() => setIsImportSqlModalOpen(true)}
           onLoadDiagram={handleLoadWorkspaceDiagram}
         />
 
@@ -953,6 +1042,7 @@ export default function App() {
           onOpenSettingsModal={() => setIsSettingsModalOpen(true)}
           onOpenChildDiagramModal={handleOpenChildDiagramModal}
           onNavigateChildDiagram={handleNavigateToChildDiagram}
+          onOpenImportSqlModal={() => setIsImportSqlModalOpen(true)}
           onUpdateNodeLabel={(nodeId, label) => {
             const targetNode = currentPage.nodes.find(n => n.id === nodeId);
             if (targetNode) {
@@ -1085,6 +1175,14 @@ export default function App() {
         activeWorkspacePath={workspaceService.getActiveWorkspacePath()}
         onManualSave={handleManualSave}
         onOpenWorkspaceModal={() => setIsWorkspaceModalOpen(true)}
+      />
+
+      <ImportSqlModal
+        isOpen={isImportSqlModalOpen}
+        onClose={() => setIsImportSqlModalOpen(false)}
+        currentPageName={currentPage.title}
+        theme={settings.theme}
+        onImportErd={handleImportErd}
       />
     </div>
   );

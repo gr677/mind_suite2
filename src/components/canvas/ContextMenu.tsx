@@ -28,6 +28,7 @@ import {
   RotateCcw,
   ExternalLink,
   FolderTree,
+  Database,
 } from 'lucide-react';
 import { THEMES } from '../../utils/themeConfig';
 import { getDefaultConnectorStyleForDiagram } from '../../utils/diagramConnectorConfig';
@@ -66,6 +67,7 @@ interface ContextMenuProps {
   onConnectNodes?: (sourceId: string, targetId: string) => void;
   onNavigateChildDiagram?: (filename: string) => void;
   onOpenChildDiagramModal?: (node: DiagramNode) => void;
+  onOpenImportSqlModal?: () => void;
   isReadOnly?: boolean;
 }
 
@@ -96,6 +98,7 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
   onConnectNodes,
   onNavigateChildDiagram,
   onOpenChildDiagramModal,
+  onOpenImportSqlModal,
   isReadOnly,
 }) => {
   const menuRef = useRef<HTMLDivElement>(null);
@@ -819,6 +822,23 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
             <FilePlus className="w-3.5 h-3.5" />
             <span>Add Diagram Page...</span>
           </button>
+
+          {onOpenImportSqlModal && (diagramType === 'erd' || diagramType === 'generic') && (
+            <button
+              onClick={() => {
+                onOpenImportSqlModal();
+                onClose();
+              }}
+              className={`w-full text-left px-2.5 py-1.5 rounded-lg flex items-center gap-2 transition-colors cursor-pointer font-semibold ${
+                isDark
+                  ? 'hover:bg-slate-800 hover:text-white text-sky-400'
+                  : 'hover:bg-sky-50 text-sky-600'
+              }`}
+            >
+              <Database className="w-3.5 h-3.5" />
+              <span>Import SQL (ERwin/Postgres)...</span>
+            </button>
+          )}
         </div>
       )}
     </div>
