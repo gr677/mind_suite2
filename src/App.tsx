@@ -109,13 +109,19 @@ export default function App() {
   const [settings, setSettings] = useState<StudioSettings>(() => {
     try {
       const saved = localStorage.getItem('omnimind_settings_v1');
-      if (saved) return JSON.parse(saved);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        return {
+          ...parsed,
+          gridSize: parsed.gridSize === 24 || !parsed.gridSize ? 48 : parsed.gridSize,
+        };
+      }
       const oldTheme = localStorage.getItem('omnimodel_theme');
       if (oldTheme) {
         return {
           theme: oldTheme as AppTheme,
           gridStyle: 'dots',
-          gridSize: 24,
+          gridSize: 48,
           snapToGrid: true,
           showHoverTooltips: true,
           showCollaborators: false,
@@ -129,7 +135,7 @@ export default function App() {
     return {
       theme: 'dark',
       gridStyle: 'dots',
-      gridSize: 24,
+      gridSize: 48, // Doubled width & height of the canvas dot grid from 24 to 48 (Change 2)
       snapToGrid: true,
       showHoverTooltips: true,
       showCollaborators: false,

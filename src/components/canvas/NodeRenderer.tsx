@@ -1210,7 +1210,7 @@ export const NodeRenderer: React.FC<NodeRendererProps> = ({
         );
       }
 
-      // 24. Mindmap Oval Node (Geometric Ellipse / Oval for Mind Maps)
+      // 24. Mindmap Oval Node (Geometric Ellipse / Oval for Mind Maps, default 80x45)
       case 'mindmap-oval': {
         const fill = node.style?.fill || 'rgba(217, 70, 239, 0.85)';
         const stroke = node.style?.stroke || '#f0abfc';
@@ -1220,7 +1220,7 @@ export const NodeRenderer: React.FC<NodeRendererProps> = ({
 
         return (
           <div
-            className="flex flex-col items-center justify-center h-full p-3 shadow-xl text-center transition-all border-2 select-none"
+            className="flex flex-col items-center justify-center h-full p-1 px-1.5 shadow-xl text-center transition-all border select-none overflow-hidden"
             style={{
               ...bgStyle,
               borderColor: stroke,
@@ -1230,12 +1230,12 @@ export const NodeRenderer: React.FC<NodeRendererProps> = ({
               color: textColor,
             }}
           >
-            <span className="text-xs font-semibold leading-snug line-clamp-3 select-none px-2">
+            <span className="text-[10px] font-semibold leading-tight line-clamp-2 select-none px-0.5 break-words max-w-full">
               {node.label}
             </span>
-            {node.data?.level !== undefined && (
-              <span className="text-[9px] font-mono opacity-80 mt-0.5">
-                Level {node.data.level}
+            {node.data?.level !== undefined && node.height >= 55 && (
+              <span className="text-[8px] font-mono opacity-80 mt-0.5">
+                Lvl {node.data.level}
               </span>
             )}
           </div>

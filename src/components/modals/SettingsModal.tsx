@@ -499,7 +499,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   Grid Cell Size
                 </label>
                 <div className="grid grid-cols-3 gap-2.5">
-                  {[16, 24, 32].map(size => (
+                  {[24, 48, 64].map(size => (
                     <button
                       key={size}
                       onClick={() => onUpdateSettings({ ...settings, gridSize: size })}
@@ -511,7 +511,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                           : 'border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-700'
                       }`}
                     >
-                      {size}px Spacing
+                      {size}px Spacing {size === 48 ? '(Default)' : ''}
                     </button>
                   ))}
                 </div>

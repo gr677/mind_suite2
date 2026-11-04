@@ -387,7 +387,7 @@ export const DiagramCanvas: React.FC<DiagramCanvasProps> = ({
   const handleWheel = (e: React.WheelEvent) => {
     e.preventDefault();
     const zoomFactor = e.deltaY < 0 ? 1.08 : 0.92;
-    const newZoom = Math.min(Math.max(zoom * zoomFactor, 0.4), 2.2);
+    const newZoom = Math.min(Math.max(zoom * zoomFactor, 0.25), 3.0);
 
     if (containerRef.current) {
       const rect = containerRef.current.getBoundingClientRect();
@@ -1143,19 +1143,19 @@ export const DiagramCanvas: React.FC<DiagramCanvasProps> = ({
         }}
       >
         <defs>
-          {/* Dynamic Grid Pattern */}
+          {/* Dynamic Grid Pattern (Doubled width and height to 48px - Change 2) */}
           <pattern
             id="canvas-dot-grid"
-            width={settings?.gridSize || 24}
-            height={settings?.gridSize || 24}
+            width={settings?.gridSize || 48}
+            height={settings?.gridSize || 48}
             patternUnits="userSpaceOnUse"
           >
             {showGrid && (settings?.gridStyle || 'dots') === 'dots' && (
-              <circle cx="2" cy="2" r="1.2" fill={themeDef.canvasDotColor} />
+              <circle cx="2" cy="2" r="1.3" fill={themeDef.canvasDotColor} />
             )}
             {showGrid && settings?.gridStyle === 'lines' && (
               <path
-                d={`M ${settings.gridSize || 24} 0 L 0 0 0 ${settings.gridSize || 24}`}
+                d={`M ${settings?.gridSize || 48} 0 L 0 0 0 ${settings?.gridSize || 48}`}
                 fill="none"
                 stroke={themeDef.canvasLineColor}
                 strokeWidth="1"
@@ -1163,7 +1163,7 @@ export const DiagramCanvas: React.FC<DiagramCanvasProps> = ({
             )}
             {showGrid && settings?.gridStyle === 'crosshairs' && (
               <path
-                d={`M 0 3 L 0 -3 M -3 0 L 3 0`}
+                d={`M 0 4 L 0 -4 M -4 0 L 4 0`}
                 fill="none"
                 stroke={themeDef.canvasDotColor}
                 strokeWidth="1"
@@ -1250,13 +1250,13 @@ export const DiagramCanvas: React.FC<DiagramCanvasProps> = ({
           </marker>
         </defs>
 
-        {/* Grid Background Rectangle */}
+        {/* Grid Background Rectangle (Doubled width and height to 200,000 x 200,000 - Change 2) */}
         <rect
           id="canvas-background-rect"
-          x="-50000"
-          y="-50000"
-          width="100000"
-          height="100000"
+          x="-100000"
+          y="-100000"
+          width="200000"
+          height="200000"
           fill="url(#canvas-dot-grid)"
         />
 
