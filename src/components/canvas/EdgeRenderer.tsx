@@ -16,8 +16,11 @@ interface EdgeRendererProps {
   onSelect?: (edgeId: string) => void;
   onContextMenu?: (edgeId: string, e: React.MouseEvent) => void;
   onStartReconnectEdge?: (edgeId: string, endpoint: 'source' | 'target', e: React.MouseEvent) => void;
+  onStartMoveSegment?: (edgeId: string, axis: 'x' | 'y', initialCoord: number, e: React.MouseEvent) => void;
+  onResetSegmentOffset?: (edgeId: string) => void;
   temporaryStart?: { x: number; y: number } | null;
   temporaryEnd?: { x: number; y: number } | null;
+  temporaryMidOffset?: number | null;
 }
 
 export const EdgeRenderer: React.FC<EdgeRendererProps> = ({
@@ -29,8 +32,11 @@ export const EdgeRenderer: React.FC<EdgeRendererProps> = ({
   onSelect,
   onContextMenu,
   onStartReconnectEdge,
+  onStartMoveSegment,
+  onResetSegmentOffset,
   temporaryStart,
   temporaryEnd,
+  temporaryMidOffset,
 }) => {
   if (!sourceNode || !targetNode) return null;
 
@@ -44,6 +50,7 @@ export const EdgeRenderer: React.FC<EdgeRendererProps> = ({
   let pathD = '';
   let midX = (start.x + end.x) / 2;
   let midY = (start.y + end.y) / 2;
+  let isSegmentVertical = false;
 
   const edgeType = edge.type || 'orthogonal';
 
@@ -72,14 +79,23 @@ export const EdgeRenderer: React.FC<EdgeRendererProps> = ({
     }
   } else {
     // Orthogonal / Stepped path with 90° corners (standard for ERD, BPMN, Architecture)
+    // Allows moving the orthogonal line segments (horizontal or vertical middle step)
+    const effectiveOffset = temporaryMidOffset !== undefined && temporaryMidOffset !== null
+      ? temporaryMidOffset
+      : edge.midOffset;
+
     if (isAnchorHorizontal(edge.sourceAnchor)) {
-      midX = start.x + (end.x - start.x) / 2;
-      pathD = `M ${start.x} ${start.y} L ${midX} ${start.y} L ${midX} ${end.y} L ${end.x} ${end.y}`;
+      isSegmentVertical = true;
+      const defaultMidX = start.x + (end.x - start.x) / 2;
+      midX = effectiveOffset !== undefined ? effectiveOffset : defaultMidX;
       midY = (start.y + end.y) / 2;
+      pathD = `M ${start.x} ${start.y} L ${midX} ${start.y} L ${midX} ${end.y} L ${end.x} ${end.y}`;
     } else {
-      midY = start.y + (end.y - start.y) / 2;
-      pathD = `M ${start.x} ${start.y} L ${start.x} ${midY} L ${end.x} ${midY} L ${end.x} ${end.y}`;
+      isSegmentVertical = false;
+      const defaultMidY = start.y + (end.y - start.y) / 2;
+      midY = effectiveOffset !== undefined ? effectiveOffset : defaultMidY;
       midX = (start.x + end.x) / 2;
+      pathD = `M ${start.x} ${start.y} L ${start.x} ${midY} L ${end.x} ${midY} L ${end.x} ${end.y}`;
     }
   }
 
@@ -126,7 +142,7 @@ export const EdgeRenderer: React.FC<EdgeRendererProps> = ({
         }
       }}
     >
-      <title>{`Connector: ${sourceNode.label} → ${targetNode.label} (${styleLabel}) - Click to select, drag endpoint handles to move connector`}</title>
+      <title>{`Connector: ${sourceNode.label} → ${targetNode.label} (${styleLabel}) - Click to select, drag endpoint handles to move connector, or drag line handle to reposition orthogonal corners`}</title>
 
       {/* Invisible wider path for easier clicking/hover */}
       <path
@@ -188,7 +204,79 @@ export const EdgeRenderer: React.FC<EdgeRendererProps> = ({
         </g>
       )}
 
-      {/* Selected Edge Endpoint Drag Handles (Change 1)
+      {/* Movable Orthogonal Middle Segment Line Handle
+          Allows users to drag and reposition the cornered orthogonal line! */}
+      {isSelected && edgeType === 'orthogonal' && (
+        <g className="pointer-events-auto">
+          {isSegmentVertical ? (
+            // Vertical line segment handle (drags horizontally)
+            <g
+              className="cursor-ew-resize group/segment"
+              transform={`translate(${midX}, ${midY})`}
+              onMouseDown={e => {
+                e.stopPropagation();
+                onStartMoveSegment?.(edge.id, 'x', midX, e);
+              }}
+              onDoubleClick={e => {
+                e.stopPropagation();
+                onResetSegmentOffset?.(edge.id);
+              }}
+            >
+              <title>Drag to move connector line horizontally (Double-click to reset)</title>
+              {/* Invisible wider grab hit area */}
+              <rect x={-10} y={-16} width={20} height={32} fill="transparent" />
+              {/* Segment grip pill */}
+              <rect
+                x={-4}
+                y={-12}
+                width={8}
+                height={24}
+                rx={4}
+                fill="#0284c7"
+                stroke="#ffffff"
+                strokeWidth={1.5}
+                className="shadow-md transition-transform group-hover/segment:scale-125"
+              />
+              {/* Grip lines */}
+              <line x1={0} y1={-6} x2={0} y2={6} stroke="#ffffff" strokeWidth={1.5} />
+            </g>
+          ) : (
+            // Horizontal line segment handle (drags vertically)
+            <g
+              className="cursor-ns-resize group/segment"
+              transform={`translate(${midX}, ${midY})`}
+              onMouseDown={e => {
+                e.stopPropagation();
+                onStartMoveSegment?.(edge.id, 'y', midY, e);
+              }}
+              onDoubleClick={e => {
+                e.stopPropagation();
+                onResetSegmentOffset?.(edge.id);
+              }}
+            >
+              <title>Drag to move connector line vertically (Double-click to reset)</title>
+              {/* Invisible wider grab hit area */}
+              <rect x={-16} y={-10} width={32} height={20} fill="transparent" />
+              {/* Segment grip pill */}
+              <rect
+                x={-12}
+                y={-4}
+                width={24}
+                height={8}
+                rx={4}
+                fill="#0284c7"
+                stroke="#ffffff"
+                strokeWidth={1.5}
+                className="shadow-md transition-transform group-hover/segment:scale-125"
+              />
+              {/* Grip lines */}
+              <line x1={-6} y1={0} x2={6} y2={0} stroke="#ffffff" strokeWidth={1.5} />
+            </g>
+          )}
+        </g>
+      )}
+
+      {/* Selected Edge Endpoint Drag Handles
           Allows dragging this specific connector endpoint from one anchor point to another,
           leaving any other connections at the same anchor point untouched! */}
       {isSelected && (

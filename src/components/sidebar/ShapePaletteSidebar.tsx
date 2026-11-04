@@ -385,7 +385,7 @@ export const ShapePaletteSidebar: React.FC<ShapePaletteSidebarProps> = ({
       <div className={`p-2.5 border-t ${themeDef.borderClass} ${themeDef.isDark ? 'bg-slate-950/50' : 'bg-slate-50'}`}>
         <button
           disabled={isReadOnly}
-          onClick={() => onSelectTemplate('sticky-yellow')}
+          onClick={() => onSelectTemplate('sticky-note')}
           className="w-full flex items-center justify-center gap-2 py-1.5 px-3 bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 rounded-lg text-xs font-medium cursor-pointer transition-colors disabled:opacity-50"
         >
           <StickyNote className="w-3.5 h-3.5" />

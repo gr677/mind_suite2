@@ -37,6 +37,7 @@ import { SettingsModal } from './components/modals/SettingsModal';
 import { CreateChildDiagramModal } from './components/modals/CreateChildDiagramModal';
 import { SaveSuccessModal } from './components/modals/SaveSuccessModal';
 import { ImportSqlModal } from './components/modals/ImportSqlModal';
+import { UnsavedChangesModal } from './components/modals/UnsavedChangesModal';
 import { workspaceService } from './services/workspaceService';
 import { getExampleDiagramForType } from './data/diagramExamples';
 import { THEMES } from './utils/themeConfig';
@@ -81,6 +82,11 @@ export default function App() {
   const [isSaveSuccessModalOpen, setIsSaveSuccessModalOpen] = useState(false);
   const [isImportSqlModalOpen, setIsImportSqlModalOpen] = useState(false);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'unsaved'>('idle');
+  const [isUnsavedModalOpen, setIsUnsavedModalOpen] = useState(false);
+  const [pendingNavigation, setPendingNavigation] = useState<{
+    action: () => void | Promise<void>;
+    targetName?: string;
+  } | null>(null);
   const [activeWs, setActiveWs] = useState(() => workspaceService.getActiveWorkspace());
   const [childModalNode, setChildModalNode] = useState<DiagramNode | null>(null);
   const [navigationHistory, setNavigationHistory] = useState<
@@ -163,6 +169,25 @@ export default function App() {
     }
   }, [currentPage]);
 
+  // Set default shape palette category filter to the relevant diagram type when opening workspace/diagram/page (Change 3)
+  useEffect(() => {
+    if (currentPage?.diagramType) {
+      setSelectedCategory(currentPage.diagramType);
+    }
+  }, [currentPage?.diagramType, activeWs.activeDiagramFilename, activePageId]);
+
+  // Browser-level safety: Prompt if leaving window/tab with unsaved changes
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (saveStatus === 'unsaved') {
+        e.preventDefault();
+        e.returnValue = '';
+      }
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [saveStatus]);
+
   // Selected nodes accessors
   const selectedNodes =
     currentPage?.nodes.filter(n => selectedNodeIds.includes(n.id)) || [];
@@ -231,6 +256,65 @@ export default function App() {
     offlineSyncService.cacheDocument(updatedDoc);
     const ws = workspaceService.getActiveWorkspace();
     workspaceService.saveCurrentDiagram(updatedDoc, ws.activeDiagramFilename);
+  }, []);
+
+  const handleManualSave = useCallback(async () => {
+    setSaveStatus('saving');
+    const ws = workspaceService.getActiveWorkspace();
+    const filename = ws.activeDiagramFilename || 'root.json';
+    workspaceService.saveCurrentDiagram(document, filename);
+    // Persist synchronously to server disk
+    const result = await workspaceService.saveCurrentDiagramToServer(document, filename);
+    if (!result.success) {
+      console.error('[OmniMind App] Save diagram failed:', result.error, result.details);
+      setSaveStatus('unsaved');
+      return;
+    }
+    collaborationService.addActivity(
+      'You',
+      '#10b981',
+      `Saved diagram to ${ws.name}/${filename}`
+    );
+    setSaveStatus('saved');
+    setTimeout(() => setSaveStatus('idle'), 2500);
+  }, [document]);
+
+  // Intercept navigation when there are unsaved changes on the current page (Change 6)
+  const requestNavigation = useCallback(
+    (action: () => void | Promise<void>, targetName?: string) => {
+      if (saveStatus === 'unsaved') {
+        setPendingNavigation({ action, targetName });
+        setIsUnsavedModalOpen(true);
+      } else {
+        action();
+      }
+    },
+    [saveStatus]
+  );
+
+  const handleSaveAndContinue = useCallback(async () => {
+    await handleManualSave();
+    setIsUnsavedModalOpen(false);
+    if (pendingNavigation) {
+      const act = pendingNavigation.action;
+      setPendingNavigation(null);
+      await act();
+    }
+  }, [handleManualSave, pendingNavigation]);
+
+  const handleDiscardAndContinue = useCallback(async () => {
+    setIsUnsavedModalOpen(false);
+    setSaveStatus('idle');
+    if (pendingNavigation) {
+      const act = pendingNavigation.action;
+      setPendingNavigation(null);
+      await act();
+    }
+  }, [pendingNavigation]);
+
+  const handleCancelNavigation = useCallback(() => {
+    setIsUnsavedModalOpen(false);
+    setPendingNavigation(null);
   }, []);
 
   // Update nodes for current page
@@ -357,6 +441,14 @@ export default function App() {
         y: canvasY,
       };
 
+      // Mind map nodes default to Gradual Darkening Fill (Change 7)
+      if (currentPage.diagramType === 'mindmap') {
+        newNode.style = {
+          ...newNode.style,
+          gradient: true,
+        };
+      }
+
       // Check if dropped inside a container group
       const enclosingGroup = currentPage.nodes.find(
         g =>
@@ -384,17 +476,19 @@ export default function App() {
     (pageId: string) => {
       const targetPage = document.pages.find(p => p.id === pageId);
       if (targetPage) {
-        setActivePageId(pageId);
-        setSelectedNodeId(null);
-        setSelectedEdgeId(null);
-        collaborationService.addActivity(
-          'You',
-          '#3b82f6',
-          `Drilled down into '${targetPage.title}'`
-        );
+        requestNavigation(() => {
+          setActivePageId(pageId);
+          setSelectedNodeId(null);
+          setSelectedEdgeId(null);
+          collaborationService.addActivity(
+            'You',
+            '#3b82f6',
+            `Drilled down into '${targetPage.title}'`
+          );
+        }, targetPage.title);
       }
     },
-    [document]
+    [document, requestNavigation]
   );
 
   // Create new page
@@ -511,52 +605,54 @@ export default function App() {
   // Flip between diagram types: Show last one open, or generate starter example!
   const handleFlipDiagramType = useCallback(
     (type: DiagramType) => {
-      // 1. If we have a recorded last-opened page of this type that still exists:
-      const lastId = lastPageByType[type];
-      const existingLast = document.pages.find(p => p.id === lastId);
-      if (existingLast) {
-        setActivePageId(existingLast.id);
+      requestNavigation(() => {
+        // 1. If we have a recorded last-opened page of this type that still exists:
+        const lastId = lastPageByType[type];
+        const existingLast = document.pages.find(p => p.id === lastId);
+        if (existingLast) {
+          setActivePageId(existingLast.id);
+          setSelectedCategory(type);
+          collaborationService.addActivity(
+            'You',
+            '#3b82f6',
+            `Flipped to last visited ${type.toUpperCase()} page`
+          );
+          return;
+        }
+
+        // 2. Or check if any page of this type exists in document.pages:
+        const existingAny = document.pages.find(p => p.diagramType === type);
+        if (existingAny) {
+          setActivePageId(existingAny.id);
+          setSelectedCategory(type);
+          collaborationService.addActivity(
+            'You',
+            '#3b82f6',
+            `Switched to ${existingAny.title}`
+          );
+          return;
+        }
+
+        // 3. Otherwise, automatically instantiate a rich starter example diagram!
+        const examplePage = getExampleDiagramForType(type);
+        const updatedPages = [...document.pages, examplePage];
+        const updatedDoc = {
+          ...document,
+          pages: updatedPages,
+          activePageId: examplePage.id,
+        };
+        persistDocument(updatedDoc);
+        setActivePageId(examplePage.id);
         setSelectedCategory(type);
+        setLastPageByType(prev => ({ ...prev, [type]: examplePage.id }));
         collaborationService.addActivity(
           'You',
-          '#3b82f6',
-          `Flipped to last visited ${type.toUpperCase()} page`
+          '#10b981',
+          `Created starter example for ${type.toUpperCase()}`
         );
-        return;
-      }
-
-      // 2. Or check if any page of this type exists in document.pages:
-      const existingAny = document.pages.find(p => p.diagramType === type);
-      if (existingAny) {
-        setActivePageId(existingAny.id);
-        setSelectedCategory(type);
-        collaborationService.addActivity(
-          'You',
-          '#3b82f6',
-          `Switched to ${existingAny.title}`
-        );
-        return;
-      }
-
-      // 3. Otherwise, automatically instantiate a rich starter example diagram!
-      const examplePage = getExampleDiagramForType(type);
-      const updatedPages = [...document.pages, examplePage];
-      const updatedDoc = {
-        ...document,
-        pages: updatedPages,
-        activePageId: examplePage.id,
-      };
-      persistDocument(updatedDoc);
-      setActivePageId(examplePage.id);
-      setSelectedCategory(type);
-      setLastPageByType(prev => ({ ...prev, [type]: examplePage.id }));
-      collaborationService.addActivity(
-        'You',
-        '#10b981',
-        `Created starter example for ${type.toUpperCase()}`
-      );
+      }, type.toUpperCase());
     },
-    [document, lastPageByType, persistDocument]
+    [document, lastPageByType, persistDocument, requestNavigation]
   );
 
   // Version snapshot commits
@@ -908,27 +1004,6 @@ export default function App() {
     }
   }, []);
 
-  const handleManualSave = useCallback(async () => {
-    setSaveStatus('saving');
-    const ws = workspaceService.getActiveWorkspace();
-    const filename = ws.activeDiagramFilename || 'root.json';
-    workspaceService.saveCurrentDiagram(document, filename);
-    // Persist synchronously to server disk
-    const result = await workspaceService.saveCurrentDiagramToServer(document, filename);
-    if (!result.success) {
-      console.error('[OmniMind App] Save diagram failed:', result.error, result.details);
-      setSaveStatus('unsaved');
-      return;
-    }
-    collaborationService.addActivity(
-      'You',
-      '#10b981',
-      `Saved diagram to ${ws.name}/${filename}`
-    );
-    setSaveStatus('saved');
-    setTimeout(() => setSaveStatus('idle'), 2500);
-  }, [document]);
-
   const handleToggleTheme = useCallback(() => {
     const themeKeys: AppTheme[] = [
       'dark',
@@ -984,9 +1059,12 @@ export default function App() {
         onOpenSettingsModal={() => setIsSettingsModalOpen(true)}
         onManualSave={handleManualSave}
         onSelectPage={pageId => {
-          setActivePageId(pageId);
-          setSelectedNodeId(null);
-          setSelectedEdgeId(null);
+          const target = document.pages.find(p => p.id === pageId);
+          requestNavigation(() => {
+            setActivePageId(pageId);
+            setSelectedNodeId(null);
+            setSelectedEdgeId(null);
+          }, target?.title);
         }}
         onOpenNewPageModal={() => setIsNewPageModalOpen(true)}
         onOpenGallery={() => setIsGalleryOpen(true)}
@@ -1225,6 +1303,14 @@ export default function App() {
         currentPageName={currentPage.title}
         theme={settings.theme}
         onImportErd={handleImportErd}
+      />
+
+      <UnsavedChangesModal
+        isOpen={isUnsavedModalOpen}
+        targetDestinationName={pendingNavigation?.targetName}
+        onSaveAndContinue={handleSaveAndContinue}
+        onDiscardAndContinue={handleDiscardAndContinue}
+        onCancel={handleCancelNavigation}
       />
     </div>
   );

@@ -122,8 +122,15 @@ export interface DiagramNode {
   };
   data: Record<string, any>; // Diagram-specific data (ERD fields, BPMN tasks, PERT numbers, etc.)
   documentation?: NodeDocumentation;
+  links?: NodeUrlLink[]; // External URLs with labels (Change 4)
   stickyNotes?: StickyNote[];
   comments?: Comment[];
+}
+
+export interface NodeUrlLink {
+  id: string;
+  label: string;
+  url: string;
 }
 
 export type NodeAnchor =
@@ -166,6 +173,7 @@ export interface DiagramEdge {
   };
   color?: string;
   strokeWidth?: number;
+  midOffset?: number; // Custom position for movable orthogonal line segments
 }
 
 export interface DiagramPage {

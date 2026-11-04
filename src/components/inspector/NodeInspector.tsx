@@ -14,6 +14,7 @@ import {
   AppTheme,
   getNodeChildDiagrams,
   ChildDiagramRef,
+  NodeUrlLink,
 } from '../../types/diagram';
 import {
   FileText,
@@ -106,6 +107,8 @@ export const NodeInspector: React.FC<NodeInspectorProps> = ({
   const [newStickyText, setNewStickyText] = useState('');
   const [stickyColor, setStickyColor] = useState<StickyNote['color']>('yellow');
   const [paletteCategory, setPaletteCategory] = useState<'pastel' | 'vibrant'>('pastel');
+  const [newUrlInput, setNewUrlInput] = useState('');
+  const [newUrlLabel, setNewUrlLabel] = useState('');
 
   const themeDef = THEMES[theme] || THEMES.dark;
 
@@ -935,6 +938,32 @@ export const NodeInspector: React.FC<NodeInspectorProps> = ({
     setNewCommentText('');
   };
 
+  // Add External URL Link (Change 4)
+  const handleAddLink = () => {
+    if (!newUrlInput.trim()) return;
+    const currentLinks = selectedNode.links || [];
+    const newLink: NodeUrlLink = {
+      id: `link-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+      url: newUrlInput.trim(),
+      label: newUrlLabel.trim() || newUrlInput.trim().replace(/^https?:\/\//, '').split('/')[0] || 'Link',
+    };
+    onUpdateNode({
+      ...selectedNode,
+      links: [...currentLinks, newLink],
+    });
+    setNewUrlInput('');
+    setNewUrlLabel('');
+  };
+
+  // Remove External URL Link
+  const handleRemoveLink = (linkId: string) => {
+    const currentLinks = selectedNode.links || [];
+    onUpdateNode({
+      ...selectedNode,
+      links: currentLinks.filter(l => l.id !== linkId),
+    });
+  };
+
   return (
     <div className={`w-80 h-full border-l flex flex-col select-none transition-colors duration-150 ${themeDef.sidebarClass}`}>
       {/* Inspector Header */}
@@ -1011,6 +1040,143 @@ export const NodeInspector: React.FC<NodeInspectorProps> = ({
               onChange={e => onUpdateNode({ ...selectedNode, label: e.target.value })}
               className="w-full bg-slate-950 border border-slate-800 rounded p-1.5 text-xs text-slate-100 focus:outline-none focus:border-blue-500 disabled:opacity-50"
             />
+          </div>
+
+          {/* Sticky Note Color Switcher (Change 2: Customizable Note Colors) */}
+          {selectedNode.type === 'sticky-note' && (
+            <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 space-y-2">
+              <label className="text-[10px] uppercase font-mono text-amber-300 font-bold block">
+                Sticky Note Color Preset
+              </label>
+              <div className="grid grid-cols-6 gap-1.5">
+                {[
+                  { name: 'Yellow', fill: '#fef08a', stroke: '#eab308', text: '#713f12' },
+                  { name: 'Pink', fill: '#fce7f3', stroke: '#f472b6', text: '#831843' },
+                  { name: 'Green', fill: '#dcfce7', stroke: '#4ade80', text: '#14532d' },
+                  { name: 'Blue', fill: '#e0f2fe', stroke: '#38bdf8', text: '#0c4a6e' },
+                  { name: 'Purple', fill: '#f3e8ff', stroke: '#c084fc', text: '#581c87' },
+                  { name: 'Orange', fill: '#ffedd5', stroke: '#fb923c', text: '#7c2d12' },
+                ].map(col => (
+                  <button
+                    key={col.name}
+                    type="button"
+                    disabled={isReadOnly}
+                    onClick={() => {
+                      onUpdateNode({
+                        ...selectedNode,
+                        style: {
+                          ...selectedNode.style,
+                          fill: col.fill,
+                          stroke: col.stroke,
+                          textColor: col.text,
+                        },
+                        data: {
+                          ...selectedNode.data,
+                          color: col.name.toLowerCase(),
+                        },
+                      });
+                    }}
+                    className="h-7 rounded border border-black/20 hover:scale-105 transition-all cursor-pointer shadow-xs"
+                    style={{ backgroundColor: col.fill, borderColor: col.stroke }}
+                    title={`${col.name} Note`}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* External URL Links Management Section (Change 4: Labeled URLs opening in new tab) */}
+          <div className="p-3 rounded-xl bg-sky-950/20 border border-sky-500/30 space-y-2.5">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-1.5 text-sky-300 font-bold text-xs">
+                <Link2 className="w-3.5 h-3.5 text-sky-400" />
+                <span>External URL Links ({(selectedNode.links || []).length})</span>
+              </div>
+            </div>
+
+            {/* List of current links */}
+            {(selectedNode.links || []).length > 0 ? (
+              <div className="space-y-1.5 max-h-48 overflow-y-auto">
+                {selectedNode.links!.map(link => (
+                  <div
+                    key={link.id}
+                    className="p-2 rounded-lg bg-slate-950/90 border border-slate-800 flex items-center justify-between gap-2"
+                  >
+                    <div className="truncate min-w-0 flex-1">
+                      <div className="font-semibold text-sky-200 text-xs truncate flex items-center gap-1">
+                        <span>{link.label}</span>
+                      </div>
+                      <div className="text-[10px] text-slate-400 font-mono truncate">
+                        {link.url}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1 shrink-0">
+                      <a
+                        href={link.url.startsWith('http') ? link.url : `https://${link.url}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="p-1 rounded bg-sky-600/30 hover:bg-sky-500 text-sky-200 hover:text-white cursor-pointer transition-colors"
+                        title="Open in new tab"
+                      >
+                        <ExternalLink className="w-3.5 h-3.5" />
+                      </a>
+                      {!isReadOnly && (
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveLink(link.id)}
+                          className="p-1 rounded text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 cursor-pointer transition-colors"
+                          title="Remove link"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-[11px] text-slate-400">
+                Attach labeled links to this node. Clicking a link opens it in a new browser tab.
+              </p>
+            )}
+
+            {/* Add new link form */}
+            {!isReadOnly && (
+              <div className="pt-2 border-t border-slate-800/80 space-y-1.5">
+                <span className="text-[10px] font-mono text-slate-400 uppercase font-semibold block">Add URL Link</span>
+                <input
+                  type="text"
+                  placeholder="URL (e.g. https://example.com/docs)"
+                  value={newUrlInput}
+                  onChange={e => setNewUrlInput(e.target.value)}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') handleAddLink();
+                  }}
+                  className="w-full bg-slate-950 border border-slate-800 rounded px-2 py-1 text-xs text-slate-200 placeholder:text-slate-600 focus:outline-none focus:border-sky-500"
+                />
+                <div className="flex items-center gap-1.5">
+                  <input
+                    type="text"
+                    placeholder="Label (e.g. Architecture RFC)"
+                    value={newUrlLabel}
+                    onChange={e => setNewUrlLabel(e.target.value)}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter') handleAddLink();
+                    }}
+                    className="flex-1 bg-slate-950 border border-slate-800 rounded px-2 py-1 text-xs text-slate-200 placeholder:text-slate-600 focus:outline-none focus:border-sky-500"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleAddLink}
+                    disabled={!newUrlInput.trim()}
+                    className="px-3 py-1 bg-sky-600 hover:bg-sky-500 disabled:opacity-40 disabled:hover:bg-sky-600 text-white font-medium rounded text-xs cursor-pointer transition-colors flex items-center gap-1 shadow-sm"
+                  >
+                    <Plus className="w-3 h-3" />
+                    <span>Add</span>
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Prominent Child Diagrams Card in Properties Tab (1-Click Navigate) */}

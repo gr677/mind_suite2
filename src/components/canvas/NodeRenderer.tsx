@@ -740,27 +740,57 @@ export const NodeRenderer: React.FC<NodeRendererProps> = ({
         );
       }
 
-      // 16. Sticky Note
+      // 16. Sticky Note (Excel-style dog-eared annotation note with customizable colors)
       case 'sticky-note': {
-        const color = node.data?.color || 'yellow';
-        const colorClasses: Record<string, string> = {
-          yellow: 'bg-amber-100 text-amber-950 border-amber-300 shadow-amber-900/20',
-          pink: 'bg-rose-100 text-rose-950 border-rose-300 shadow-rose-900/20',
-          green: 'bg-emerald-100 text-emerald-950 border-emerald-300 shadow-emerald-900/20',
-          blue: 'bg-sky-100 text-sky-950 border-sky-300 shadow-sky-900/20',
-          purple: 'bg-purple-100 text-purple-950 border-purple-300 shadow-purple-900/20',
+        const defaultColorMap: Record<string, { fill: string; stroke: string; text: string }> = {
+          yellow: { fill: '#fef08a', stroke: '#eab308', text: '#713f12' },
+          pink: { fill: '#fce7f3', stroke: '#f472b6', text: '#831843' },
+          green: { fill: '#dcfce7', stroke: '#4ade80', text: '#14532d' },
+          blue: { fill: '#e0f2fe', stroke: '#38bdf8', text: '#0c4a6e' },
+          purple: { fill: '#f3e8ff', stroke: '#c084fc', text: '#581c87' },
+          orange: { fill: '#ffedd5', stroke: '#fb923c', text: '#7c2d12' },
         };
+        const colorKey = (node.data?.color || 'yellow').toLowerCase();
+        const fallback = defaultColorMap[colorKey] || defaultColorMap.yellow;
+        const fill = node.style?.fill || fallback.fill;
+        const stroke = node.style?.stroke || fallback.stroke;
+        const textColor = node.style?.textColor || fallback.text;
+        const darkerFold = getDarkerShade(fill, 0.22);
+
         return (
           <div
-            className={`flex flex-col justify-between h-full p-2.5 rounded-sm border shadow-md font-sans text-xs ${
-              colorClasses[color] || colorClasses.yellow
-            }`}
+            className="relative flex flex-col justify-between h-full p-2.5 font-sans text-xs shadow-md select-none group/sticky"
+            style={{
+              backgroundColor: fill,
+              color: textColor,
+              border: `1px solid ${stroke}`,
+              borderRadius: '2px',
+              clipPath: 'polygon(0 0, calc(100% - 16px) 0, 100% 16px, 100% 100%, 0 100%)',
+            }}
           >
-            <div className="flex items-center justify-between opacity-70 pb-1 border-b border-black/10 text-[10px]">
-              <StickyIcon className="w-3 h-3" />
-              <span>{node.data?.author || 'Note'}</span>
+            {/* Excel-style folded dog-ear flap in top-right corner */}
+            <div
+              className="absolute top-0 right-0 w-4 h-4 pointer-events-none"
+              style={{
+                clipPath: 'polygon(0 0, 0 100%, 100% 100%)',
+                backgroundColor: darkerFold,
+                borderBottom: `1px solid ${stroke}`,
+                borderLeft: `1px solid ${stroke}`,
+                boxShadow: '-1px 1px 3px rgba(0,0,0,0.18)',
+              }}
+            />
+
+            <div
+              className="flex items-center justify-between pb-1 border-b text-[10px] pr-4 opacity-75 font-medium"
+              style={{ borderColor: `${stroke}50` }}
+            >
+              <div className="flex items-center gap-1">
+                <StickyIcon className="w-3 h-3" />
+                <span>{node.data?.author || 'Note'}</span>
+              </div>
             </div>
-            <div className="flex-1 py-1 font-medium leading-relaxed whitespace-pre-wrap overflow-y-auto">
+
+            <div className="flex-1 py-1 font-normal leading-relaxed whitespace-pre-wrap overflow-y-auto">
               {node.label}
             </div>
           </div>
@@ -1506,40 +1536,94 @@ export const NodeRenderer: React.FC<NodeRendererProps> = ({
         return null;
       })()}
 
-      {/* Human-Friendly Mouse-Entry Anchored Hover Description Tooltip */}
-      {isHovered && mouseEntryPos && (node.documentation?.description || (node.stickyNotes && node.stickyNotes.length > 0)) && (
+      {/* External URL Link Badges on Node (Change 4) */}
+      {node.links && node.links.length > 0 && (
         <div
-          className="absolute z-50 flex flex-col w-64 p-2.5 bg-slate-900/95 border border-slate-700/80 rounded-xl shadow-2xl text-[11px] text-slate-200 pointer-events-none backdrop-blur-md animate-in fade-in zoom-in-95 duration-150"
-          style={{
-            left: `${Math.min(Math.max(mouseEntryPos.x, 24), Math.max(node.width - 24, 24))}px`,
-            top: `${mouseEntryPos.y}px`,
-            transform: 'translate(-50%, -100%) translateY(14px)',
-          }}
+          className={`absolute ${node.type === 'sticky-note' ? '-top-3 left-2' : '-top-3 right-2'} flex items-center gap-1 z-30 pointer-events-auto`}
         >
-          <div className="flex items-center justify-between font-mono text-[9px] text-sky-400 border-b border-slate-800 pb-1 mb-1">
-            <span className="font-bold truncate">{node.label}</span>
-            <span className="uppercase px-1 py-0.2 bg-slate-800 rounded text-slate-400">{node.type}</span>
+          {node.links.map(link => (
+            <a
+              key={link.id}
+              href={link.url.startsWith('http') ? link.url : `https://${link.url}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={e => e.stopPropagation()}
+              title={`Open link: "${link.label}" (${link.url}) in new tab`}
+              className="px-1.5 py-0.5 rounded-full bg-blue-600 hover:bg-blue-500 text-white text-[9px] font-sans font-medium flex items-center gap-1 shadow-md border border-blue-400/40 cursor-pointer transition-transform hover:scale-105"
+            >
+              <ExternalLink className="w-2.5 h-2.5" />
+              <span className="max-w-[70px] truncate">{link.label}</span>
+            </a>
+          ))}
+        </div>
+      )}
+
+      {/* Human-Friendly Hover Description Tooltip (Change 5 & Change 8: Positioned further from center & accommodates all text) */}
+      {isHovered && (node.documentation?.description || (node.stickyNotes && node.stickyNotes.length > 0) || (node.links && node.links.length > 0)) && (
+        <div
+          className="absolute z-50 flex flex-col max-w-md w-max min-w-[260px] p-3 bg-slate-900/98 border border-slate-700/90 rounded-xl shadow-2xl text-[11px] text-slate-200 pointer-events-auto backdrop-blur-md animate-in fade-in zoom-in-95 duration-150"
+          style={{
+            left: `${node.width / 2}px`,
+            top: `-16px`,
+            transform: 'translate(-50%, -100%)',
+          }}
+          onMouseDown={e => e.stopPropagation()}
+        >
+          <div className="flex items-center justify-between font-mono text-[9px] text-sky-400 border-b border-slate-800 pb-1.5 mb-1.5">
+            <span className="font-bold truncate max-w-[180px]">{node.label}</span>
+            <span className="uppercase px-1.5 py-0.5 bg-slate-800 rounded text-slate-300 font-semibold">{node.type}</span>
           </div>
+
+          {/* Full description without line-clamp truncation so all text is visible */}
           {node.documentation?.description && (
-            <p className="text-slate-300 leading-relaxed line-clamp-3">
+            <div className="text-slate-300 leading-relaxed whitespace-pre-wrap break-words max-h-72 overflow-y-auto pr-1">
               {node.documentation.description}
-            </p>
+            </div>
           )}
+
+          {/* Tags */}
           {node.documentation?.tags && node.documentation.tags.length > 0 && (
-            <div className="flex flex-wrap gap-1 mt-1.5">
+            <div className="flex flex-wrap gap-1 mt-2">
               {node.documentation.tags.map((t, idx) => (
-                <span key={idx} className="px-1.5 py-0.2 bg-blue-500/15 text-blue-300 rounded text-[9px] font-mono">
+                <span key={idx} className="px-1.5 py-0.5 bg-blue-500/15 border border-blue-500/30 text-blue-300 rounded text-[9px] font-mono">
                   #{t}
                 </span>
               ))}
             </div>
           )}
+
+          {/* External Links inside tooltip */}
+          {node.links && node.links.length > 0 && (
+            <div className="mt-2 pt-2 border-t border-slate-800 space-y-1">
+              <span className="text-[9px] uppercase font-mono text-slate-400 block font-semibold">
+                External Links ({node.links.length})
+              </span>
+              <div className="flex flex-wrap gap-1.5">
+                {node.links.map(link => (
+                  <a
+                    key={link.id}
+                    href={link.url.startsWith('http') ? link.url : `https://${link.url}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={e => e.stopPropagation()}
+                    className="px-2 py-0.5 rounded bg-blue-500/20 hover:bg-blue-500/30 border border-blue-500/40 text-blue-300 hover:text-blue-100 text-[10px] font-sans flex items-center gap-1 cursor-pointer transition-colors"
+                  >
+                    <ExternalLink className="w-2.5 h-2.5" />
+                    <span>{link.label}</span>
+                  </a>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Sticky Notes */}
           {node.stickyNotes && node.stickyNotes.length > 0 && (
-            <div className="mt-1.5 pt-1 border-t border-slate-800/80 text-[10px] text-amber-300 font-mono flex items-center gap-1">
+            <div className="mt-2 pt-1.5 border-t border-slate-800 text-[10px] text-amber-300 font-mono flex items-center gap-1">
               <span>★ {node.stickyNotes.length} sticky note{node.stickyNotes.length === 1 ? '' : 's'}</span>
             </div>
           )}
-          {/* Subtle pointer tip directed at entry point */}
+
+          {/* Pointer tip pointing towards top of node */}
           <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-[1px] border-4 border-transparent border-t-slate-700" />
         </div>
       )}

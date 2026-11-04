@@ -173,6 +173,14 @@ export const DiagramCanvas: React.FC<DiagramCanvasProps> = ({
     endpoint: 'source' | 'target';
   } | null>(null);
 
+  // Movable orthogonal connector lines state (move cornered line segments)
+  const [movingEdgeSegment, setMovingEdgeSegment] = useState<{
+    edgeId: string;
+    axis: 'x' | 'y';
+    initialCoord: number;
+  } | null>(null);
+  const [tempSegmentOffset, setTempSegmentOffset] = useState<number | null>(null);
+
   const [currentMousePos, setCurrentMousePos] = useState({ x: 0, y: 0 });
 
   // Hover state for highlighting connected/linked nodes
@@ -434,6 +442,30 @@ export const DiagramCanvas: React.FC<DiagramCanvasProps> = ({
     setReconnectingEdge({ edgeId, endpoint });
   };
 
+  // Start moving an orthogonal connector line segment (orthogonal corner adjustment)
+  const handleStartMoveSegment = (
+    edgeId: string,
+    axis: 'x' | 'y',
+    initialCoord: number,
+    e: React.MouseEvent
+  ) => {
+    if (isReadOnly) return;
+    e.stopPropagation();
+    onSelectEdge(edgeId);
+    setMovingEdgeSegment({ edgeId, axis, initialCoord });
+    setTempSegmentOffset(initialCoord);
+  };
+
+  // Reset an orthogonal connector line segment offset to auto-centered default
+  const handleResetSegmentOffset = (edgeId: string) => {
+    if (isReadOnly || !onUpdateEdge) return;
+    const targetEdge = edges.find(e => e.id === edgeId);
+    if (targetEdge) {
+      onUpdateEdge({ ...targetEdge, midOffset: undefined });
+    }
+    setTempSegmentOffset(null);
+  };
+
   // Direct Node Mouse Down for selection and batch dragging (Change 3)
   const handleNodeMouseDown = (nodeId: string, e: React.MouseEvent) => {
     if (e.button !== 0) return;
@@ -504,34 +536,49 @@ export const DiagramCanvas: React.FC<DiagramCanvasProps> = ({
       target.tagName === 'svg' ||
       target.tagName === 'rect';
 
-    // Middle-click pans
+    // Middle-click pans or Alt-click pans
     if (e.button === 1 || (e.button === 0 && e.altKey)) {
       setIsPanning(true);
       setPanStart({ x: e.clientX - pan.x, y: e.clientY - pan.y });
       return;
     }
 
-    // Left click on background: start marquee box selection
+    // Left click on background:
     if (e.button === 0 && isBackground) {
-      const coords = screenToCanvasCoords(e.clientX, e.clientY);
-      setMarqueeBox({
-        startX: coords.x,
-        startY: coords.y,
-        currentX: coords.x,
-        currentY: coords.y,
-        isShift: e.shiftKey || e.metaKey || e.ctrlKey,
-      });
-
-      if (!e.shiftKey && !e.metaKey && !e.ctrlKey) {
-        onSelectNode(null);
-        onSelectEdge(null);
+      if (e.shiftKey) {
+        // Shift+drag: start marquee box selection
+        const coords = screenToCanvasCoords(e.clientX, e.clientY);
+        setMarqueeBox({
+          startX: coords.x,
+          startY: coords.y,
+          currentX: coords.x,
+          currentY: coords.y,
+          isShift: true,
+        });
+        return;
       }
+
+      // Regular Left Click on Background: Pan the whole diagram around (Change 1)
+      setIsPanning(true);
+      setPanStart({ x: e.clientX - pan.x, y: e.clientY - pan.y });
+      onSelectNode(null);
+      onSelectEdge(null);
     }
   };
 
   // Window-level mouse move and mouse up listeners
   useEffect(() => {
-    if (!isPanning && !draggingNodeId && !resizing && !marqueeBox && !reconnectingEdge && !connectingFrom) return;
+    if (
+      !isPanning &&
+      !draggingNodeId &&
+      !resizing &&
+      !marqueeBox &&
+      !reconnectingEdge &&
+      !connectingFrom &&
+      !movingEdgeSegment
+    ) {
+      return;
+    }
 
     const onWindowMouseMove = (e: MouseEvent) => {
       const canvasCoords = screenToCanvasCoords(e.clientX, e.clientY);
@@ -542,6 +589,14 @@ export const DiagramCanvas: React.FC<DiagramCanvasProps> = ({
           x: e.clientX - panStart.x,
           y: e.clientY - panStart.y,
         });
+        return;
+      }
+
+      // Handle Movable Orthogonal Connector Line Segment Dragging
+      if (movingEdgeSegment) {
+        const coord = movingEdgeSegment.axis === 'x' ? canvasCoords.x : canvasCoords.y;
+        const snappedCoord = gridSnap ? Math.round(coord / 20) * 20 : Math.round(coord);
+        setTempSegmentOffset(snappedCoord);
         return;
       }
 
@@ -719,6 +774,21 @@ export const DiagramCanvas: React.FC<DiagramCanvasProps> = ({
 
         setReconnectingEdge(null);
       }
+
+      // Handle releasing a moved orthogonal connector line segment
+      if (movingEdgeSegment && !isReadOnly && onUpdateEdge) {
+        if (tempSegmentOffset !== null) {
+          const targetEdge = edges.find(ed => ed.id === movingEdgeSegment.edgeId);
+          if (targetEdge) {
+            onUpdateEdge({
+              ...targetEdge,
+              midOffset: tempSegmentOffset,
+            });
+          }
+        }
+        setMovingEdgeSegment(null);
+        setTempSegmentOffset(null);
+      }
     };
 
     window.addEventListener('mousemove', onWindowMouseMove);
@@ -737,6 +807,9 @@ export const DiagramCanvas: React.FC<DiagramCanvasProps> = ({
     marqueeBox,
     reconnectingEdge,
     connectingFrom,
+    movingEdgeSegment,
+    tempSegmentOffset,
+    edges,
     gridSnap,
     isReadOnly,
     nodes,
@@ -877,7 +950,9 @@ export const DiagramCanvas: React.FC<DiagramCanvasProps> = ({
     <div
       ref={containerRef}
       id="canvas-container"
-      className="relative flex-1 w-full h-full overflow-hidden select-none cursor-default transition-colors duration-200"
+      className={`relative flex-1 w-full h-full overflow-hidden select-none transition-colors duration-200 ${
+        isPanning ? 'cursor-grabbing' : 'cursor-grab'
+      }`}
       style={{ backgroundColor: themeDef.canvasBg }}
       onWheel={handleWheel}
       onMouseDown={handleMouseDown}
@@ -1208,8 +1283,11 @@ export const DiagramCanvas: React.FC<DiagramCanvasProps> = ({
               onSelect={onSelectEdge}
               onContextMenu={handleEdgeContextMenu}
               onStartReconnectEdge={handleStartReconnectEdge}
+              onStartMoveSegment={handleStartMoveSegment}
+              onResetSegmentOffset={handleResetSegmentOffset}
               temporaryStart={tempStart}
               temporaryEnd={tempEnd}
+              temporaryMidOffset={movingEdgeSegment?.edgeId === edge.id ? tempSegmentOffset : undefined}
             />
           );
         })}
