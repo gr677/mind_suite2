@@ -307,10 +307,126 @@ export const NodeInspector: React.FC<NodeInspectorProps> = ({
             </div>
           </div>
 
-          {/* Marker End (Arrow, Crow's foot, Diamond, None) */}
+          {/* ERD Cardinality Quick Presets (Change 2) */}
           <div>
             <label className={`text-[10px] uppercase font-mono font-bold block mb-1.5 ${themeDef.textMutedClass}`}>
-              Line End Marker
+              ERD Cardinality Quick Presets
+            </label>
+            <div className="grid grid-cols-2 gap-1.5">
+              <button
+                type="button"
+                disabled={isReadOnly}
+                onClick={() => onUpdateEdge?.({
+                  ...selectedEdge,
+                  markerStart: 'crow-one-only',
+                  markerEnd: 'crow-zero-many',
+                  label: '1:0..*',
+                })}
+                className={`p-1.5 rounded-lg border text-xs font-mono transition-colors text-left ${
+                  selectedEdge.markerStart === 'crow-one-only' && selectedEdge.markerEnd === 'crow-zero-many'
+                    ? 'bg-sky-600 text-white font-bold border-sky-500'
+                    : themeDef.isDark
+                    ? 'bg-slate-950 border-slate-800 text-slate-300 hover:border-slate-700'
+                    : 'bg-white border-slate-200 text-slate-700 hover:border-slate-300'
+                }`}
+                title="One and only one to Zero through many (1:0..*)"
+              >
+                1 ➔ 0..* (Zero or Many)
+              </button>
+              <button
+                type="button"
+                disabled={isReadOnly}
+                onClick={() => onUpdateEdge?.({
+                  ...selectedEdge,
+                  markerStart: 'crow-one-only',
+                  markerEnd: 'crow-one-many',
+                  label: '1:1..*',
+                })}
+                className={`p-1.5 rounded-lg border text-xs font-mono transition-colors text-left ${
+                  selectedEdge.markerStart === 'crow-one-only' && selectedEdge.markerEnd === 'crow-one-many'
+                    ? 'bg-sky-600 text-white font-bold border-sky-500'
+                    : themeDef.isDark
+                    ? 'bg-slate-950 border-slate-800 text-slate-300 hover:border-slate-700'
+                    : 'bg-white border-slate-200 text-slate-700 hover:border-slate-300'
+                }`}
+                title="One and only one to One through many (1:1..*)"
+              >
+                1 ➔ 1..* (One or Many)
+              </button>
+              <button
+                type="button"
+                disabled={isReadOnly}
+                onClick={() => onUpdateEdge?.({
+                  ...selectedEdge,
+                  markerStart: 'crow-one-only',
+                  markerEnd: 'crow-one-only',
+                  label: '1:1',
+                })}
+                className={`p-1.5 rounded-lg border text-xs font-mono transition-colors text-left ${
+                  selectedEdge.markerStart === 'crow-one-only' && selectedEdge.markerEnd === 'crow-one-only'
+                    ? 'bg-sky-600 text-white font-bold border-sky-500'
+                    : themeDef.isDark
+                    ? 'bg-slate-950 border-slate-800 text-slate-300 hover:border-slate-700'
+                    : 'bg-white border-slate-200 text-slate-700 hover:border-slate-300'
+                }`}
+                title="One and only one to One and only one (1:1)"
+              >
+                1 ➔ 1 (One & Only One)
+              </button>
+              <button
+                type="button"
+                disabled={isReadOnly}
+                onClick={() => onUpdateEdge?.({
+                  ...selectedEdge,
+                  markerStart: 'crow-one-only',
+                  markerEnd: 'crow-zero-one',
+                  label: '1:0..1',
+                })}
+                className={`p-1.5 rounded-lg border text-xs font-mono transition-colors text-left ${
+                  selectedEdge.markerStart === 'crow-one-only' && selectedEdge.markerEnd === 'crow-zero-one'
+                    ? 'bg-sky-600 text-white font-bold border-sky-500'
+                    : themeDef.isDark
+                    ? 'bg-slate-950 border-slate-800 text-slate-300 hover:border-slate-700'
+                    : 'bg-white border-slate-200 text-slate-700 hover:border-slate-300'
+                }`}
+                title="One and only one to Zero or one (1:0..1)"
+              >
+                1 ➔ 0..1 (Zero or One)
+              </button>
+            </div>
+          </div>
+
+          {/* Line Start Marker (Source End / Cardinality) */}
+          <div>
+            <label className={`text-[10px] uppercase font-mono font-bold block mb-1.5 ${themeDef.textMutedClass}`}>
+              Line Start Marker (Source Cardinality)
+            </label>
+            <select
+              disabled={isReadOnly}
+              value={selectedEdge.markerStart || 'none'}
+              onChange={e => onUpdateEdge?.({ ...selectedEdge, markerStart: e.target.value as any })}
+              className={`w-full p-2 rounded-lg border text-xs focus:outline-none focus:border-blue-500 ${
+                themeDef.isDark ? 'bg-slate-950 border-slate-800 text-slate-200' : 'bg-white border-slate-200 text-slate-800'
+              }`}
+            >
+              <option value="none">None (Plain Line)</option>
+              <option value="crow-one-only">One and Only One (1..1 - || double bars)</option>
+              <option value="crow-zero-many">Zero through Many (0..* - O&gt;-- circle + crow's foot)</option>
+              <option value="crow-one-many">One through Many (1..* - |&gt;-- bar + crow's foot)</option>
+              <option value="crow-zero-one">Zero or One (0..1 - O| circle + bar)</option>
+              <option value="crow-foot-many">Many (* - &gt;-- crow's foot)</option>
+              <option value="crow-foot-one">Exactly One (1 - | single bar)</option>
+              <option value="arrow">Arrow (Flow)</option>
+              <option value="diamond">Diamond (Composition)</option>
+              <option value="diamond-filled">Filled Diamond (Aggregation)</option>
+              <option value="circle">Circle Marker</option>
+            </select>
+          </div>
+
+          {/* Line End Marker (Target End / Cardinality) */}
+          <div>
+            <label className={`text-[10px] uppercase font-mono font-bold block mb-1.5 ${themeDef.textMutedClass}`}>
+              Line End Marker (Target Cardinality)
             </label>
             <select
               disabled={isReadOnly}
@@ -320,13 +436,17 @@ export const NodeInspector: React.FC<NodeInspectorProps> = ({
                 themeDef.isDark ? 'bg-slate-950 border-slate-800 text-slate-200' : 'bg-white border-slate-200 text-slate-800'
               }`}
             >
-              <option value="arrow">Arrow (Standard Flow)</option>
-              <option value="crow-foot-many">Crow's Foot Zero or Many (0..*)</option>
-              <option value="crow-foot-one">Crow's Foot Exactly One (1)</option>
-              <option value="diamond">Diamond (UML Composition)</option>
-              <option value="diamond-filled">Filled Diamond (UML Aggregation)</option>
+              <option value="arrow">Arrow (Flow)</option>
+              <option value="crow-zero-many">Zero through Many (0..* - O&gt;-- circle + crow's foot)</option>
+              <option value="crow-one-many">One through Many (1..* - |&gt;-- bar + crow's foot)</option>
+              <option value="crow-one-only">One and Only One (1..1 - || double bars)</option>
+              <option value="crow-zero-one">Zero or One (0..1 - O| circle + bar)</option>
+              <option value="crow-foot-many">Many (* - &gt;-- crow's foot)</option>
+              <option value="crow-foot-one">Exactly One (1 - | single bar)</option>
+              <option value="diamond">Diamond (Composition)</option>
+              <option value="diamond-filled">Filled Diamond (Aggregation)</option>
               <option value="circle">Circle Marker</option>
-              <option value="none">None (Clean Line - Mind Map)</option>
+              <option value="none">None (Plain Line)</option>
             </select>
           </div>
 
@@ -1081,6 +1201,32 @@ export const NodeInspector: React.FC<NodeInspectorProps> = ({
                     title={`${col.name} Note`}
                   />
                 ))}
+              </div>
+
+              {/* Direct Docs & Notes Content for Sticky Note (Change 4) */}
+              <div className="pt-2 border-t border-amber-500/20">
+                <label className="text-[10px] uppercase font-mono text-amber-300 font-bold block mb-1">
+                  Docs & Notes Text
+                </label>
+                <textarea
+                  rows={4}
+                  disabled={isReadOnly}
+                  value={selectedNode.documentation?.description || ''}
+                  onChange={e => {
+                    const desc = e.target.value;
+                    const currentDocs = selectedNode.documentation || {
+                      description: '',
+                      tags: ['Notes'],
+                      status: 'draft',
+                    };
+                    onUpdateNode({
+                      ...selectedNode,
+                      documentation: { ...currentDocs, description: desc },
+                    });
+                  }}
+                  placeholder="Enter docs, commentary, and notes to show on this sticky note..."
+                  className="w-full bg-slate-950 border border-slate-800 rounded p-2 text-xs text-slate-100 focus:outline-none focus:border-amber-500 disabled:opacity-50 font-sans leading-relaxed"
+                />
               </div>
             </div>
           )}

@@ -99,14 +99,27 @@ export const EdgeRenderer: React.FC<EdgeRendererProps> = ({
     }
   }
 
-  // Determine marker
-  let markerEndId = 'marker-arrow';
-  if (edge.markerEnd === 'crow-foot-many') markerEndId = 'marker-crow-many';
-  else if (edge.markerEnd === 'crow-foot-one') markerEndId = 'marker-crow-one';
-  else if (edge.markerEnd === 'diamond') markerEndId = 'marker-diamond';
-  else if (edge.markerEnd === 'diamond-filled') markerEndId = 'marker-diamond-filled';
-  else if (edge.markerEnd === 'circle') markerEndId = 'marker-circle';
-  else if (edge.markerEnd === 'none') markerEndId = '';
+  // Helper to map edge marker type to SVG marker ID in DiagramCanvas (Change 2)
+  const getMarkerId = (marker?: string): string => {
+    switch (marker) {
+      case 'crow-zero-many': return 'marker-crow-zero-many'; // 0..*
+      case 'crow-one-many': return 'marker-crow-one-many';   // 1..*
+      case 'crow-one-only': return 'marker-crow-one-only';   // 1..1
+      case 'crow-zero-one': return 'marker-crow-zero-one';   // 0..1
+      case 'crow-foot-many': return 'marker-crow-many';      // *
+      case 'crow-foot': return 'marker-crow-many';
+      case 'crow-foot-one': return 'marker-crow-one';        // 1
+      case 'diamond': return 'marker-diamond';
+      case 'diamond-filled': return 'marker-diamond-filled';
+      case 'circle': return 'marker-circle';
+      case 'arrow': return 'marker-arrow';
+      case 'none': return '';
+      default: return '';
+    }
+  };
+
+  const markerStartId = getMarkerId(edge.markerStart);
+  const markerEndId = edge.markerEnd ? getMarkerId(edge.markerEnd) : (edge.markerStart ? '' : 'marker-arrow');
 
   const strokeColor = edge.color || (isSelected ? '#38bdf8' : '#94a3b8');
   const strokeDash =
@@ -166,13 +179,14 @@ export const EdgeRenderer: React.FC<EdgeRendererProps> = ({
         />
       )}
 
-      {/* Visible Path */}
+      {/* Visible Path with Start and End Markers (Change 2) */}
       <path
         d={pathD}
         fill="none"
         stroke={strokeColor}
         strokeWidth={edge.strokeWidth || (isSelected ? 2.5 : 1.75)}
         strokeDasharray={strokeDash}
+        markerStart={markerStartId ? `url(#${markerStartId})` : undefined}
         markerEnd={markerEndId ? `url(#${markerEndId})` : undefined}
         className="transition-colors group-hover:stroke-sky-400"
       />
@@ -281,7 +295,7 @@ export const EdgeRenderer: React.FC<EdgeRendererProps> = ({
           leaving any other connections at the same anchor point untouched! */}
       {isSelected && (
         <g className="pointer-events-auto">
-          {/* Source Endpoint Drag Handle (Start) */}
+          {/* Source Endpoint Drag Handle (Start - Enormous 44px hit area - Change 3) */}
           <g
             className="cursor-grab active:cursor-grabbing group/handle"
             transform={`translate(${start.x}, ${start.y})`}
@@ -291,27 +305,29 @@ export const EdgeRenderer: React.FC<EdgeRendererProps> = ({
             }}
           >
             <title>{`Drag start point from "${sourceNode.label}" to another anchor point`}</title>
+            {/* Invisible large hit area (44px diameter) for easy grabbing */}
+            <circle r={22} fill="transparent" className="cursor-grab" />
             {/* Pulsing ring */}
             <circle
-              r={11}
-              fill="rgba(56, 189, 248, 0.2)"
+              r={13}
+              fill="rgba(56, 189, 248, 0.25)"
               stroke="#38bdf8"
               strokeWidth={1.5}
-              className="animate-ping origin-center"
+              className="animate-ping origin-center pointer-events-none"
             />
             {/* Outer handle ring */}
             <circle
-              r={7}
+              r={8.5}
               fill="#0284c7"
               stroke="#ffffff"
-              strokeWidth={2}
-              className="shadow-md transition-transform group-hover/handle:scale-125"
+              strokeWidth={2.5}
+              className="shadow-lg transition-transform group-hover/handle:scale-130 pointer-events-none"
             />
             {/* Inner dot */}
-            <circle r={2.5} fill="#ffffff" />
+            <circle r={3} fill="#ffffff" className="pointer-events-none" />
           </g>
 
-          {/* Target Endpoint Drag Handle (End) */}
+          {/* Target Endpoint Drag Handle (End - Enormous 44px hit area - Change 3) */}
           <g
             className="cursor-grab active:cursor-grabbing group/handle"
             transform={`translate(${end.x}, ${end.y})`}
@@ -321,24 +337,26 @@ export const EdgeRenderer: React.FC<EdgeRendererProps> = ({
             }}
           >
             <title>{`Drag end point from "${targetNode.label}" to another anchor point`}</title>
+            {/* Invisible large hit area (44px diameter) for easy grabbing */}
+            <circle r={22} fill="transparent" className="cursor-grab" />
             {/* Pulsing ring */}
             <circle
-              r={11}
-              fill="rgba(52, 211, 153, 0.2)"
+              r={13}
+              fill="rgba(52, 211, 153, 0.25)"
               stroke="#34d399"
               strokeWidth={1.5}
-              className="animate-ping origin-center"
+              className="animate-ping origin-center pointer-events-none"
             />
             {/* Outer handle ring */}
             <circle
-              r={7}
+              r={8.5}
               fill="#10b981"
               stroke="#ffffff"
-              strokeWidth={2}
-              className="shadow-md transition-transform group-hover/handle:scale-125"
+              strokeWidth={2.5}
+              className="shadow-lg transition-transform group-hover/handle:scale-130 pointer-events-none"
             />
             {/* Inner dot */}
-            <circle r={2.5} fill="#ffffff" />
+            <circle r={3} fill="#ffffff" className="pointer-events-none" />
           </g>
         </g>
       )}

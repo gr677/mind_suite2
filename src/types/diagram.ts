@@ -148,6 +148,21 @@ export type NodeAnchor =
   | 'left-top'
   | string;
 
+export type EdgeMarkerType =
+  | 'none'
+  | 'arrow'
+  | 'crow-foot'
+  | 'crow-foot-one' // Exactly one (1)
+  | 'crow-foot-many' // Many (*)
+  | 'crow-zero-many' // Zero through many (0..*)
+  | 'crow-one-many' // One through many (1..*)
+  | 'crow-one-only' // One and only one (1..1)
+  | 'crow-zero-one' // Zero or one (0..1)
+  | 'diamond'
+  | 'diamond-filled'
+  | 'circle'
+  | 'icom-arrow';
+
 export interface DiagramEdge {
   id: string;
   sourceNodeId: string;
@@ -157,16 +172,8 @@ export interface DiagramEdge {
   label?: string;
   type: 'straight' | 'orthogonal' | 'curved';
   lineStyle: 'solid' | 'dashed' | 'dotted';
-  markerStart: 'none' | 'arrow' | 'crow-foot' | 'diamond' | 'circle';
-  markerEnd:
-    | 'none'
-    | 'arrow'
-    | 'crow-foot-one'
-    | 'crow-foot-many'
-    | 'diamond'
-    | 'diamond-filled'
-    | 'circle'
-    | 'icom-arrow';
+  markerStart: EdgeMarkerType;
+  markerEnd: EdgeMarkerType;
   cardinality?: {
     source?: string;
     target?: string;

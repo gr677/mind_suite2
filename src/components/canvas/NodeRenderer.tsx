@@ -102,13 +102,7 @@ export const NodeRenderer: React.FC<NodeRendererProps> = ({
               data-anchor-id={def.id}
               data-node-id={node.id}
               style={def.positionStyle}
-              className={`absolute w-3 h-3 rounded-full border-2 transition-all z-30 cursor-crosshair pointer-events-auto ${
-                isTargetCandidate
-                  ? 'opacity-95 bg-sky-400 border-white dark:border-slate-900 shadow-md shadow-sky-500/50 hover:bg-emerald-400 hover:scale-150 hover:ring-2 hover:ring-emerald-300 animate-pulse'
-                  : isSourceNode
-                  ? 'opacity-85 bg-blue-600 border-white'
-                  : 'opacity-0 group-hover:opacity-100 bg-sky-500 hover:bg-emerald-400 border-white dark:border-slate-900 shadow-md hover:scale-140'
-              }`}
+              className="absolute w-7 h-7 flex items-center justify-center -translate-x-1/2 -translate-y-1/2 z-30 cursor-crosshair pointer-events-auto group/anchor"
               onMouseDown={e => {
                 e.stopPropagation();
                 onStartConnection?.(node.id, def.id, e);
@@ -130,7 +124,18 @@ export const NodeRenderer: React.FC<NodeRendererProps> = ({
                   ? `Stick connection to ${def.label}`
                   : `Connect from ${def.label}`
               }
-            />
+            >
+              {/* Visible anchor point circle with enlarged hover effect */}
+              <div
+                className={`w-3.5 h-3.5 rounded-full border-2 transition-all ${
+                  isTargetCandidate
+                    ? 'opacity-100 bg-emerald-400 border-white dark:border-slate-900 scale-140 ring-4 ring-emerald-400/40 animate-pulse'
+                    : isSourceNode
+                    ? 'opacity-90 bg-blue-600 border-white scale-110'
+                    : 'opacity-0 group-hover:opacity-100 group-hover/anchor:opacity-100 bg-sky-500 hover:bg-emerald-400 border-white dark:border-slate-900 shadow-md group-hover/anchor:scale-130'
+                }`}
+              />
+            </div>
           );
         })}
       </>
@@ -757,9 +762,16 @@ export const NodeRenderer: React.FC<NodeRendererProps> = ({
         const textColor = node.style?.textColor || fallback.text;
         const darkerFold = getDarkerShade(fill, 0.22);
 
+        const docsText = node.documentation?.description?.trim() || '';
+        const dataNotes = (node.data?.notes || node.data?.description || '').trim();
+        const attachedNotes = node.stickyNotes && node.stickyNotes.length > 0
+          ? node.stickyNotes.map(n => n.text).filter(Boolean).join('\n')
+          : '';
+        const combinedDocsNotes = [docsText, dataNotes, attachedNotes].filter(Boolean).join('\n\n');
+
         return (
           <div
-            className="relative flex flex-col justify-between h-full p-2.5 font-sans text-xs shadow-md select-none group/sticky"
+            className="relative flex flex-col justify-between h-full p-2.5 font-sans text-xs shadow-md select-none group/sticky overflow-hidden"
             style={{
               backgroundColor: fill,
               color: textColor,
@@ -781,17 +793,39 @@ export const NodeRenderer: React.FC<NodeRendererProps> = ({
             />
 
             <div
-              className="flex items-center justify-between pb-1 border-b text-[10px] pr-4 opacity-75 font-medium"
+              className="flex items-center justify-between pb-1 border-b text-[10px] pr-4 opacity-80 font-medium"
               style={{ borderColor: `${stroke}50` }}
             >
-              <div className="flex items-center gap-1">
-                <StickyIcon className="w-3 h-3" />
-                <span>{node.data?.author || 'Note'}</span>
+              <div className="flex items-center gap-1 truncate max-w-[140px]">
+                <StickyIcon className="w-3 h-3 shrink-0" />
+                <span className="truncate">{node.data?.author || 'Note'}</span>
               </div>
+              {node.documentation?.status && (
+                <span className="text-[9px] uppercase font-mono opacity-70">
+                  {node.documentation.status}
+                </span>
+              )}
             </div>
 
-            <div className="flex-1 py-1 font-normal leading-relaxed whitespace-pre-wrap overflow-y-auto">
-              {node.label}
+            {/* Note Content: Title + Docs & Notes (Change 4) */}
+            <div className="flex-1 py-1 font-normal leading-relaxed overflow-y-auto space-y-1">
+              {node.label && (
+                <div
+                  className="font-bold text-[11px] leading-snug pb-0.5 border-b"
+                  style={{ borderColor: `${stroke}35` }}
+                >
+                  {node.label}
+                </div>
+              )}
+              {combinedDocsNotes ? (
+                <div className="text-[10px] sm:text-[10.5px] leading-relaxed whitespace-pre-wrap opacity-90 font-normal">
+                  {combinedDocsNotes}
+                </div>
+              ) : !node.label ? (
+                <div className="text-[10px] italic opacity-60">
+                  Empty note. Use Inspector or double-click to add text.
+                </div>
+              ) : null}
             </div>
           </div>
         );

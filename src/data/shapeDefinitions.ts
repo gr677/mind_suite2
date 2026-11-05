@@ -928,9 +928,9 @@ export const SHAPE_TEMPLATES: ShapeTemplate[] = [
     description: 'Excel-style dog-eared annotation note with customizable color',
     defaultNode: {
       type: 'sticky-note',
-      label: 'Note: add architectural commentary, specs, or review notes here.',
-      width: 180,
-      height: 140,
+      label: 'Architecture Note',
+      width: 190,
+      height: 150,
       style: {
         fill: '#fef08a',
         stroke: '#facc15',
@@ -939,6 +939,11 @@ export const SHAPE_TEMPLATES: ShapeTemplate[] = [
         rounded: 0,
       },
       data: { color: 'yellow', author: 'Team Member' },
+      documentation: {
+        description: 'Docs & notes: add architectural commentary, specs, assumptions, or review notes here.',
+        tags: ['Notes'],
+        status: 'draft',
+      },
     },
   },
 ];

@@ -1119,6 +1119,81 @@ export const DiagramCanvas: React.FC<DiagramCanvasProps> = ({
             </button>
           )}
 
+          {/* Quick ERD Relationship Presets (Change 2) */}
+          <div className="flex items-center gap-1 pl-1.5 border-l border-slate-700/50">
+            <span className={`text-[10px] font-mono font-semibold uppercase ${themeDef.textMutedClass}`}>
+              ERD:
+            </span>
+            <button
+              type="button"
+              onClick={() => onUpdateEdge?.({
+                ...selectedEdge,
+                markerStart: 'crow-one-only',
+                markerEnd: 'crow-zero-many',
+                label: '1:0..*',
+              })}
+              className={`px-1.5 py-0.5 rounded text-[10px] font-mono transition-colors cursor-pointer ${
+                selectedEdge.markerStart === 'crow-one-only' && selectedEdge.markerEnd === 'crow-zero-many'
+                  ? 'bg-sky-600 text-white font-bold'
+                  : themeDef.isDark ? 'hover:bg-slate-800 text-slate-300' : 'hover:bg-slate-100 text-slate-700'
+              }`}
+              title="1..1 to 0..* (One and only one ➔ Zero through many)"
+            >
+              1:0..*
+            </button>
+            <button
+              type="button"
+              onClick={() => onUpdateEdge?.({
+                ...selectedEdge,
+                markerStart: 'crow-one-only',
+                markerEnd: 'crow-one-many',
+                label: '1:1..*',
+              })}
+              className={`px-1.5 py-0.5 rounded text-[10px] font-mono transition-colors cursor-pointer ${
+                selectedEdge.markerStart === 'crow-one-only' && selectedEdge.markerEnd === 'crow-one-many'
+                  ? 'bg-sky-600 text-white font-bold'
+                  : themeDef.isDark ? 'hover:bg-slate-800 text-slate-300' : 'hover:bg-slate-100 text-slate-700'
+              }`}
+              title="1..1 to 1..* (One and only one ➔ One through many)"
+            >
+              1:1..*
+            </button>
+            <button
+              type="button"
+              onClick={() => onUpdateEdge?.({
+                ...selectedEdge,
+                markerStart: 'crow-one-only',
+                markerEnd: 'crow-one-only',
+                label: '1:1',
+              })}
+              className={`px-1.5 py-0.5 rounded text-[10px] font-mono transition-colors cursor-pointer ${
+                selectedEdge.markerStart === 'crow-one-only' && selectedEdge.markerEnd === 'crow-one-only'
+                  ? 'bg-sky-600 text-white font-bold'
+                  : themeDef.isDark ? 'hover:bg-slate-800 text-slate-300' : 'hover:bg-slate-100 text-slate-700'
+              }`}
+              title="1..1 to 1..1 (One and only one ➔ One and only one)"
+            >
+              1:1
+            </button>
+            <button
+              type="button"
+              onClick={() => onUpdateEdge?.({
+                ...selectedEdge,
+                markerStart: 'crow-one-only',
+                markerEnd: 'crow-zero-one',
+                label: '1:0..1',
+              })}
+              className={`px-1.5 py-0.5 rounded text-[10px] font-mono transition-colors cursor-pointer ${
+                selectedEdge.markerStart === 'crow-one-only' && selectedEdge.markerEnd === 'crow-zero-one'
+                  ? 'bg-sky-600 text-white font-bold'
+                  : themeDef.isDark ? 'hover:bg-slate-800 text-slate-300' : 'hover:bg-slate-100 text-slate-700'
+              }`}
+              title="1..1 to 0..1 (One and only one ➔ Zero or one)"
+            >
+              1:0..1
+            </button>
+          </div>
+
           <div className={`w-[1px] h-4 mx-0.5 ${themeDef.isDark ? 'bg-slate-700' : 'bg-slate-300'}`} />
 
           {/* Delete connector */}
@@ -1133,17 +1208,16 @@ export const DiagramCanvas: React.FC<DiagramCanvasProps> = ({
         </div>
       )}
 
-      {/* SVG Canvas Root for Lines, Connectors, Grid & Marquee Selection Box */}
+      {/* SVG Canvas Root with overflow-visible so connections and dots are never clipped (Change 1) */}
       <svg
         id="canvas-background"
-        className="absolute inset-0 w-full h-full pointer-events-auto"
+        className="absolute inset-0 w-full h-full pointer-events-auto overflow-visible"
         style={{
-          transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
-          transformOrigin: '0 0',
+          overflow: 'visible',
         }}
       >
         <defs>
-          {/* Dynamic Grid Pattern (Doubled width and height to 48px - Change 2) */}
+          {/* Dynamic Grid Pattern (Doubled width and height to 48px) */}
           <pattern
             id="canvas-dot-grid"
             width={settings?.gridSize || 48}
@@ -1184,30 +1258,91 @@ export const DiagramCanvas: React.FC<DiagramCanvasProps> = ({
             <path d="M 0 1 L 9 5 L 0 9 z" fill="#94a3b8" />
           </marker>
 
-          {/* Crow's Foot: Zero or Many (0..*) */}
+          {/* Crow's Foot: Zero through Many (0..*) - Circle + Crow's Foot (Change 2) */}
           <marker
-            id="marker-crow-many"
-            viewBox="0 0 16 16"
-            refX="14"
+            id="marker-crow-zero-many"
+            viewBox="0 0 24 16"
+            refX="22"
             refY="8"
-            markerWidth="10"
-            markerHeight="10"
-            orient="auto"
+            markerWidth="13"
+            markerHeight="13"
+            orient="auto-start-reverse"
           >
-            <path d="M 1 8 L 14 2 M 1 8 L 14 8 M 1 8 L 14 14" stroke="#38bdf8" strokeWidth="2" fill="none" />
+            <line x1="0" y1="8" x2="9" y2="8" stroke="#38bdf8" strokeWidth="2" />
+            <circle cx="5" cy="8" r="3.5" fill="#0f172a" stroke="#38bdf8" strokeWidth="2" />
+            <path d="M 9 8 L 22 2 M 9 8 L 22 8 M 9 8 L 22 14" stroke="#38bdf8" strokeWidth="2" fill="none" strokeLinecap="round" />
           </marker>
 
-          {/* Crow's Foot: Exactly One (1) */}
+          {/* Crow's Foot: One through Many (1..*) - Perpendicular Bar + Crow's Foot (Change 2) */}
+          <marker
+            id="marker-crow-one-many"
+            viewBox="0 0 24 16"
+            refX="22"
+            refY="8"
+            markerWidth="13"
+            markerHeight="13"
+            orient="auto-start-reverse"
+          >
+            <line x1="0" y1="8" x2="9" y2="8" stroke="#38bdf8" strokeWidth="2" />
+            <line x1="5" y1="2" x2="5" y2="14" stroke="#38bdf8" strokeWidth="2.5" strokeLinecap="round" />
+            <path d="M 9 8 L 22 2 M 9 8 L 22 8 M 9 8 L 22 14" stroke="#38bdf8" strokeWidth="2" fill="none" strokeLinecap="round" />
+          </marker>
+
+          {/* Crow's Foot: One and Only One (1..1) - Double Perpendicular Bars (Change 2) */}
+          <marker
+            id="marker-crow-one-only"
+            viewBox="0 0 20 16"
+            refX="18"
+            refY="8"
+            markerWidth="12"
+            markerHeight="12"
+            orient="auto-start-reverse"
+          >
+            <line x1="0" y1="8" x2="16" y2="8" stroke="#34d399" strokeWidth="2" />
+            <line x1="9" y1="2" x2="9" y2="14" stroke="#34d399" strokeWidth="2.5" strokeLinecap="round" />
+            <line x1="16" y1="2" x2="16" y2="14" stroke="#34d399" strokeWidth="2.5" strokeLinecap="round" />
+          </marker>
+
+          {/* Crow's Foot: Zero or One (0..1) - Circle + Perpendicular Bar (Change 2) */}
+          <marker
+            id="marker-crow-zero-one"
+            viewBox="0 0 22 16"
+            refX="19"
+            refY="8"
+            markerWidth="12"
+            markerHeight="12"
+            orient="auto-start-reverse"
+          >
+            <line x1="0" y1="8" x2="16" y2="8" stroke="#38bdf8" strokeWidth="2" />
+            <circle cx="6" cy="8" r="3.5" fill="#0f172a" stroke="#38bdf8" strokeWidth="2" />
+            <line x1="16" y1="2" x2="16" y2="14" stroke="#38bdf8" strokeWidth="2.5" strokeLinecap="round" />
+          </marker>
+
+          {/* Crow's Foot: Many (*) - Classic Three-Pronged Foot */}
+          <marker
+            id="marker-crow-many"
+            viewBox="0 0 18 16"
+            refX="16"
+            refY="8"
+            markerWidth="11"
+            markerHeight="11"
+            orient="auto-start-reverse"
+          >
+            <path d="M 2 8 L 16 2 M 2 8 L 16 8 M 2 8 L 16 14" stroke="#38bdf8" strokeWidth="2" fill="none" strokeLinecap="round" />
+          </marker>
+
+          {/* Crow's Foot: Exactly One (1) - Single Perpendicular Line */}
           <marker
             id="marker-crow-one"
-            viewBox="0 0 16 16"
-            refX="14"
+            viewBox="0 0 18 16"
+            refX="16"
             refY="8"
-            markerWidth="10"
-            markerHeight="10"
-            orient="auto"
+            markerWidth="11"
+            markerHeight="11"
+            orient="auto-start-reverse"
           >
-            <path d="M 10 2 L 10 14 M 14 2 L 14 14" stroke="#34d399" strokeWidth="2" fill="none" />
+            <line x1="2" y1="8" x2="14" y2="8" stroke="#34d399" strokeWidth="2" />
+            <line x1="14" y1="2" x2="14" y2="14" stroke="#34d399" strokeWidth="2.5" strokeLinecap="round" />
           </marker>
 
           {/* Diamond Marker (UML Composition) */}
@@ -1218,7 +1353,7 @@ export const DiagramCanvas: React.FC<DiagramCanvasProps> = ({
             refY="8"
             markerWidth="10"
             markerHeight="10"
-            orient="auto"
+            orient="auto-start-reverse"
           >
             <polygon points="1,8 8,2 15,8 8,14" fill="#0f172a" stroke="#06b6d4" strokeWidth="2" />
           </marker>
@@ -1231,7 +1366,7 @@ export const DiagramCanvas: React.FC<DiagramCanvasProps> = ({
             refY="8"
             markerWidth="10"
             markerHeight="10"
-            orient="auto"
+            orient="auto-start-reverse"
           >
             <polygon points="1,8 8,2 15,8 8,14" fill="#06b6d4" stroke="#06b6d4" strokeWidth="1" />
           </marker>
@@ -1244,89 +1379,98 @@ export const DiagramCanvas: React.FC<DiagramCanvasProps> = ({
             refY="6"
             markerWidth="8"
             markerHeight="8"
-            orient="auto"
+            orient="auto-start-reverse"
           >
             <circle cx="6" cy="6" r="4" fill="#38bdf8" stroke="#0f172a" strokeWidth="1" />
           </marker>
         </defs>
 
-        {/* Grid Background Rectangle (Doubled width and height to 200,000 x 200,000 - Change 2) */}
-        <rect
-          id="canvas-background-rect"
-          x="-100000"
-          y="-100000"
-          width="200000"
-          height="200000"
-          fill="url(#canvas-dot-grid)"
-        />
-
-        {/* Render Edges */}
-        {edges.map(edge => {
-          const source = nodes.find(n => n.id === edge.sourceNodeId);
-          const target = nodes.find(n => n.id === edge.targetNodeId);
-          const isEdgeConnected = activeFocusNodeId
-            ? (edge.sourceNodeId === activeFocusNodeId || edge.targetNodeId === activeFocusNodeId)
-            : true;
-
-          const isReconnectingThis = reconnectingEdge?.edgeId === edge.id;
-          const tempStart = isReconnectingThis && reconnectingEdge.endpoint === 'source' ? currentMousePos : null;
-          const tempEnd = isReconnectingThis && reconnectingEdge.endpoint === 'target' ? currentMousePos : null;
-
-          return (
-            <EdgeRenderer
-              key={edge.id}
-              edge={edge}
-              sourceNode={source}
-              targetNode={target}
-              isSelected={selectedEdgeId === edge.id}
-              isDeemphasized={activeFocusNodeId ? !isEdgeConnected : false}
-              onSelect={onSelectEdge}
-              onContextMenu={handleEdgeContextMenu}
-              onStartReconnectEdge={handleStartReconnectEdge}
-              onStartMoveSegment={handleStartMoveSegment}
-              onResetSegmentOffset={handleResetSegmentOffset}
-              temporaryStart={tempStart}
-              temporaryEnd={tempEnd}
-              temporaryMidOffset={movingEdgeSegment?.edgeId === edge.id ? tempSegmentOffset : undefined}
-            />
-          );
-        })}
-
-        {/* Temporary Drawing Line while creating a new connection */}
-        {connectingFrom && (
-          <line
-            x1={(() => {
-              const src = nodes.find(n => n.id === connectingFrom.nodeId);
-              return src ? getNodeAnchorCoords(src, connectingFrom.anchor).x : currentMousePos.x;
-            })()}
-            y1={(() => {
-              const src = nodes.find(n => n.id === connectingFrom.nodeId);
-              return src ? getNodeAnchorCoords(src, connectingFrom.anchor).y : currentMousePos.y;
-            })()}
-            x2={currentMousePos.x}
-            y2={currentMousePos.y}
-            stroke="#38bdf8"
-            strokeWidth="2.5"
-            strokeDasharray="5 5"
-            markerEnd="url(#marker-arrow)"
-          />
-        )}
-
-        {/* Marquee Selection Rectangle (Change 3) */}
-        {marqueeBox && (
+        {/* Transformed Canvas Plane Group (Change 1: Ensures connections & dots never clip) */}
+        <g
+          id="canvas-transformed-plane"
+          style={{
+            transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
+            transformOrigin: '0 0',
+          }}
+        >
+          {/* Infinite Grid Background Rectangle (Expanded to 1,000,000 x 1,000,000 px - Change 1) */}
           <rect
-            x={Math.min(marqueeBox.startX, marqueeBox.currentX)}
-            y={Math.min(marqueeBox.startY, marqueeBox.currentY)}
-            width={Math.abs(marqueeBox.currentX - marqueeBox.startX)}
-            height={Math.abs(marqueeBox.currentY - marqueeBox.startY)}
-            fill="rgba(56, 189, 248, 0.15)"
-            stroke="#38bdf8"
-            strokeWidth="1.5"
-            strokeDasharray="4 3"
-            rx={2}
-            className="pointer-events-none"
+            id="canvas-background-rect"
+            x="-500000"
+            y="-500000"
+            width="1000000"
+            height="1000000"
+            fill="url(#canvas-dot-grid)"
           />
-        )}
+
+          {/* Render Edges */}
+          {edges.map(edge => {
+            const source = nodes.find(n => n.id === edge.sourceNodeId);
+            const target = nodes.find(n => n.id === edge.targetNodeId);
+            const isEdgeConnected = activeFocusNodeId
+              ? (edge.sourceNodeId === activeFocusNodeId || edge.targetNodeId === activeFocusNodeId)
+              : true;
+
+            const isReconnectingThis = reconnectingEdge?.edgeId === edge.id;
+            const tempStart = isReconnectingThis && reconnectingEdge.endpoint === 'source' ? currentMousePos : null;
+            const tempEnd = isReconnectingThis && reconnectingEdge.endpoint === 'target' ? currentMousePos : null;
+
+            return (
+              <EdgeRenderer
+                key={edge.id}
+                edge={edge}
+                sourceNode={source}
+                targetNode={target}
+                isSelected={selectedEdgeId === edge.id}
+                isDeemphasized={activeFocusNodeId ? !isEdgeConnected : false}
+                onSelect={onSelectEdge}
+                onContextMenu={handleEdgeContextMenu}
+                onStartReconnectEdge={handleStartReconnectEdge}
+                onStartMoveSegment={handleStartMoveSegment}
+                onResetSegmentOffset={handleResetSegmentOffset}
+                temporaryStart={tempStart}
+                temporaryEnd={tempEnd}
+                temporaryMidOffset={movingEdgeSegment?.edgeId === edge.id ? tempSegmentOffset : undefined}
+              />
+            );
+          })}
+
+          {/* Temporary Drawing Line while creating a new connection */}
+          {connectingFrom && (
+            <line
+              x1={(() => {
+                const src = nodes.find(n => n.id === connectingFrom.nodeId);
+                return src ? getNodeAnchorCoords(src, connectingFrom.anchor).x : currentMousePos.x;
+              })()}
+              y1={(() => {
+                const src = nodes.find(n => n.id === connectingFrom.nodeId);
+                return src ? getNodeAnchorCoords(src, connectingFrom.anchor).y : currentMousePos.y;
+              })()}
+              x2={currentMousePos.x}
+              y2={currentMousePos.y}
+              stroke="#38bdf8"
+              strokeWidth="2.5"
+              strokeDasharray="5 5"
+              markerEnd="url(#marker-arrow)"
+            />
+          )}
+
+          {/* Marquee Selection Rectangle (Change 3) */}
+          {marqueeBox && (
+            <rect
+              x={Math.min(marqueeBox.startX, marqueeBox.currentX)}
+              y={Math.min(marqueeBox.startY, marqueeBox.currentY)}
+              width={Math.abs(marqueeBox.currentX - marqueeBox.startX)}
+              height={Math.abs(marqueeBox.currentY - marqueeBox.startY)}
+              fill="rgba(56, 189, 248, 0.15)"
+              stroke="#38bdf8"
+              strokeWidth="1.5"
+              strokeDasharray="4 3"
+              rx={2}
+              className="pointer-events-none"
+            />
+          )}
+        </g>
       </svg>
 
       {/* HTML Layer for High-Fidelity Nodes */}

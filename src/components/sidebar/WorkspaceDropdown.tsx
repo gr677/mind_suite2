@@ -177,14 +177,11 @@ export const WorkspaceDropdown: React.FC<WorkspaceDropdownProps> = ({
 
   return (
     <div ref={dropdownRef} className="relative z-30 mb-2">
-      {/* Label above dropdown */}
-      <div className="flex items-center justify-between px-1 mb-1 text-[10px] font-mono font-bold tracking-wider">
-        <span className={`flex items-center gap-1.5 uppercase ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
-          <HardDrive className="w-3 h-3 text-amber-500" />
-          <span>Workspace</span>
-        </span>
-        <span className="text-[9px] text-amber-400/90 font-mono truncate max-w-[130px] normal-case font-medium">
-          {windowsRootDisplay}
+      {/* Label above dropdown (Change 5: Increased font size and removed path location to the right) */}
+      <div className="flex items-center px-1 mb-1.5">
+        <span className={`flex items-center gap-1.5 uppercase font-bold text-xs tracking-wider ${isDark ? 'text-slate-200' : 'text-slate-800'}`}>
+          <HardDrive className="w-4 h-4 text-amber-500" />
+          <span>WORKSPACE</span>
         </span>
       </div>
 
