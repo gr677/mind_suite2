@@ -37,6 +37,7 @@ import { SettingsModal } from './components/modals/SettingsModal';
 import { CreateChildDiagramModal } from './components/modals/CreateChildDiagramModal';
 import { SaveSuccessModal } from './components/modals/SaveSuccessModal';
 import { ImportSqlModal } from './components/modals/ImportSqlModal';
+import { GenerateMindmapModal } from './components/modals/GenerateMindmapModal';
 import { UnsavedChangesModal } from './components/modals/UnsavedChangesModal';
 import { workspaceService } from './services/workspaceService';
 import { getExampleDiagramForType } from './data/diagramExamples';
@@ -81,6 +82,7 @@ export default function App() {
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   const [isSaveSuccessModalOpen, setIsSaveSuccessModalOpen] = useState(false);
   const [isImportSqlModalOpen, setIsImportSqlModalOpen] = useState(false);
+  const [isGenerateMindmapModalOpen, setIsGenerateMindmapModalOpen] = useState(false);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'unsaved'>('idle');
   const [isUnsavedModalOpen, setIsUnsavedModalOpen] = useState(false);
   const [pendingNavigation, setPendingNavigation] = useState<{
@@ -1079,6 +1081,7 @@ export default function App() {
         onOpenRestApiModal={() => setIsRestApiModalOpen(true)}
         onOpenOfflineModal={() => setIsOfflineModalOpen(true)}
         onOpenImportSqlModal={() => setIsImportSqlModalOpen(true)}
+        onOpenGenerateMindmapModal={() => setIsGenerateMindmapModalOpen(true)}
         onChangeRole={setUserRole}
         onToggleTheme={handleToggleTheme}
         onSwitchDiagram={handleSwitchDiagram}
@@ -1166,6 +1169,7 @@ export default function App() {
           onOpenChildDiagramModal={handleOpenChildDiagramModal}
           onNavigateChildDiagram={handleNavigateToChildDiagram}
           onOpenImportSqlModal={() => setIsImportSqlModalOpen(true)}
+          onOpenGenerateMindmapModal={() => setIsGenerateMindmapModalOpen(true)}
           onUpdateNodeLabel={(nodeId, label) => {
             const targetNode = currentPage.nodes.find(n => n.id === nodeId);
             if (targetNode) {
@@ -1309,6 +1313,34 @@ export default function App() {
         currentPageName={currentPage.title}
         theme={settings.theme}
         onImportErd={handleImportErd}
+      />
+
+      <GenerateMindmapModal
+        isOpen={isGenerateMindmapModalOpen}
+        onClose={() => setIsGenerateMindmapModalOpen(false)}
+        currentPageName={currentPage.title}
+        theme={settings.theme}
+        onMindmapGenerated={(title: string, description: string, genNodes: DiagramNode[], genEdges: DiagramEdge[]) => {
+          const updatedPages = document.pages.map(page => {
+            if (page.id !== activePageId) return page;
+            return {
+              ...page,
+              title: page.title === 'Mind Map' || page.title.startsWith('Page ') || page.title === 'Untitled Diagram' ? title : page.title,
+              nodes: genNodes,
+              edges: genEdges,
+            };
+          });
+
+          const updatedDoc: DiagramDocument = {
+            ...document,
+            pages: updatedPages,
+            updatedAt: new Date().toISOString(),
+          };
+
+          persistDocument(updatedDoc);
+          setSaveStatus('unsaved');
+          setSelectedNodeIds(genNodes.map(n => n.id));
+        }}
       />
 
       <UnsavedChangesModal

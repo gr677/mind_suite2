@@ -56,6 +56,7 @@ interface AppHeaderProps {
   onOpenWorkspaceModal: () => void;
   onOpenSettingsModal: () => void;
   onOpenImportSqlModal?: () => void;
+  onOpenGenerateMindmapModal?: () => void;
   onManualSave: () => void;
   onSelectPage: (pageId: string) => void;
   onOpenNewPageModal: () => void;
@@ -84,6 +85,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
   onOpenWorkspaceModal,
   onOpenSettingsModal,
   onOpenImportSqlModal,
+  onOpenGenerateMindmapModal,
   onManualSave,
   onSelectPage,
   onOpenNewPageModal,
@@ -232,6 +234,19 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
           </button>
         )}
 
+        {/* Dedicated Mind Map Gemini AI Generator Button */}
+        {currentPage.diagramType === 'mindmap' && onOpenGenerateMindmapModal && (
+          <button
+            onClick={onOpenGenerateMindmapModal}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white rounded-lg text-xs font-bold cursor-pointer transition-all shadow-md shadow-purple-600/30 shrink-0 animate-in fade-in"
+            title="Generate Mind Map with Gemini AI from a topic prompt"
+          >
+            <Sparkles className="w-3.5 h-3.5 text-purple-200" />
+            <span>AI Mind Map</span>
+            <span className="text-[9px] font-mono px-1 py-0.2 rounded bg-black/25">Gemini</span>
+          </button>
+        )}
+
         {/* Diagram Types Catalog Launcher */}
         <button
           onClick={onOpenGallery}
@@ -349,6 +364,26 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
                     <span>Import SQL (ERwin/Postgres)</span>
                   </div>
                   <span className="text-[9px] font-mono px-1.5 py-0.2 bg-sky-500/15 text-sky-400 rounded">SQL</span>
+                </button>
+              )}
+
+              {/* Generate Mind Map with Gemini */}
+              {onOpenGenerateMindmapModal && (currentPage.diagramType === 'mindmap' || currentPage.diagramType === 'generic') && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsToolsDropdownOpen(false);
+                    onOpenGenerateMindmapModal();
+                  }}
+                  className={`w-full text-left px-2.5 py-2 rounded-lg flex items-center justify-between transition-colors cursor-pointer ${
+                    isDark ? 'hover:bg-slate-800 text-slate-200' : 'hover:bg-slate-100 text-slate-800'
+                  }`}
+                >
+                  <div className="flex items-center gap-2">
+                    <Sparkles className="w-3.5 h-3.5 text-purple-400" />
+                    <span>Gemini Mind Map Generator</span>
+                  </div>
+                  <span className="text-[9px] font-mono px-1.5 py-0.2 bg-purple-500/15 text-purple-400 rounded">AI</span>
                 </button>
               )}
 

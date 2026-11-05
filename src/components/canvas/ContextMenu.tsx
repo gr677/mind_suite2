@@ -29,6 +29,7 @@ import {
   ExternalLink,
   FolderTree,
   Database,
+  Sparkles,
 } from 'lucide-react';
 import { THEMES } from '../../utils/themeConfig';
 import { getDefaultConnectorStyleForDiagram } from '../../utils/diagramConnectorConfig';
@@ -68,6 +69,7 @@ interface ContextMenuProps {
   onNavigateChildDiagram?: (filename: string) => void;
   onOpenChildDiagramModal?: (node: DiagramNode) => void;
   onOpenImportSqlModal?: () => void;
+  onOpenGenerateMindmapModal?: () => void;
   isReadOnly?: boolean;
 }
 
@@ -99,6 +101,7 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
   onNavigateChildDiagram,
   onOpenChildDiagramModal,
   onOpenImportSqlModal,
+  onOpenGenerateMindmapModal,
   isReadOnly,
 }) => {
   const menuRef = useRef<HTMLDivElement>(null);
@@ -837,6 +840,23 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
             >
               <Database className="w-3.5 h-3.5" />
               <span>Import SQL (ERwin/Postgres)...</span>
+            </button>
+          )}
+
+          {onOpenGenerateMindmapModal && (diagramType === 'mindmap' || diagramType === 'generic') && (
+            <button
+              onClick={() => {
+                onOpenGenerateMindmapModal();
+                onClose();
+              }}
+              className={`w-full text-left px-2.5 py-1.5 rounded-lg flex items-center gap-2 transition-colors cursor-pointer font-semibold ${
+                isDark
+                  ? 'hover:bg-slate-800 hover:text-white text-purple-400'
+                  : 'hover:bg-purple-50 text-purple-600'
+              }`}
+            >
+              <Sparkles className="w-3.5 h-3.5" />
+              <span>Generate Mind Map with Gemini AI...</span>
             </button>
           )}
         </div>

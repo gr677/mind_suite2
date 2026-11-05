@@ -11,7 +11,8 @@ import { promisify } from 'util';
 import fs from 'fs';
 import fsp from 'fs/promises';
 import { initialDiagramDocument } from './src/data/seedDiagrams';
-import { DiagramDocument, DiagramPage, DiagramVersion } from './src/types/diagram';
+import { DiagramDocument, DiagramPage, DiagramVersion, DiagramNode, DiagramEdge } from './src/types/diagram';
+import { GoogleGenAI, Type } from '@google/genai';
 
 const execAsync = promisify(exec);
 
@@ -883,6 +884,289 @@ app.delete('/api/workspaces/:workspaceId/files/:filename', async (req: Request, 
   } catch (err: any) {
     logDebug('error', 'STORAGE DELETE', `Failed to delete file ${req.params.filename}: ${err.message}`, err.stack);
     res.status(500).json({ error: err.message || 'Failed to delete file from server disk' });
+  }
+});
+
+// 9. AI Mind Map Generator using Gemini API (Change 1)
+app.post('/api/ai/generate-mindmap', async (req: Request, res: Response) => {
+  const startTime = Date.now();
+  try {
+    const { topic } = req.body;
+    if (!topic || typeof topic !== 'string' || topic.trim().length < 2) {
+      return res.status(400).json({
+        success: false,
+        error: 'Please enter a valid topic or description for the mind map.',
+      });
+    }
+
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      logDebug('warn', 'GEMINI_AI', 'GEMINI_API_KEY is not defined in server environment');
+      return res.status(400).json({
+        success: false,
+        error:
+          'GEMINI_API_KEY is not configured on the server. Please set GEMINI_API_KEY="your_api_key" in your server run script or environment.',
+      });
+    }
+
+    logDebug('info', 'GEMINI_AI', `Generating mind map for topic: "${topic.slice(0, 80)}..." using gemini-3.8-flash`);
+
+    const ai = new GoogleGenAI({
+      apiKey,
+      httpOptions: {
+        headers: {
+          'User-Agent': 'aistudio-build',
+        },
+      },
+    });
+
+    const promptText = `You are an expert system architect and knowledge mapper.
+Create a comprehensive, richly structured mind map for the following topic:
+"${topic.trim()}"
+
+Return a JSON object conforming to the schema with:
+- title: A concise, professional title for this mind map (under 6 words).
+- centralTopic: The core theme or main subject (under 5 words).
+- centralDescription: A comprehensive 1-3 sentence summary of this theme.
+- branches: An array of 4 to 6 main high-level concept branches. Each branch must have:
+  - title: Short concept name (under 5 words).
+  - description: 1-3 sentences explaining this concept and its architectural role.
+  - color: Hex color code for this branch family (e.g. #3b82f6, #10b981, #f59e0b, #ec4899, #8b5cf6, #06b6d4).
+  - subbranches: An array of 2 to 3 specific sub-topics/tactics/components under this branch. Each must have:
+    - title: Short sub-topic name (under 4 words).
+    - description: 1-2 sentences explaining this sub-topic in detail.`;
+
+    const response = await ai.models.generateContent({
+      model: 'gemini-3.8-flash',
+      contents: promptText,
+      config: {
+        responseMimeType: 'application/json',
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            title: { type: Type.STRING },
+            centralTopic: { type: Type.STRING },
+            centralDescription: { type: Type.STRING },
+            branches: {
+              type: Type.ARRAY,
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  title: { type: Type.STRING },
+                  description: { type: Type.STRING },
+                  color: { type: Type.STRING },
+                  subbranches: {
+                    type: Type.ARRAY,
+                    items: {
+                      type: Type.OBJECT,
+                      properties: {
+                        title: { type: Type.STRING },
+                        description: { type: Type.STRING },
+                      },
+                      required: ['title', 'description'],
+                    },
+                  },
+                },
+                required: ['title', 'description', 'subbranches'],
+              },
+            },
+          },
+          required: ['title', 'centralTopic', 'centralDescription', 'branches'],
+        },
+      },
+    });
+
+    const rawJson = (response.text || '{}').trim();
+    const data = JSON.parse(rawJson);
+
+    const title = data.title || 'Mind Map';
+    const centralTopic = data.centralTopic || topic.trim();
+    const centralDescription = data.centralDescription || `Mind map exploration of ${topic.trim()}`;
+    const branches = Array.isArray(data.branches) ? data.branches : [];
+
+    // Construct diagram nodes & edges with radial coordinate distribution
+    const generatedNodes: DiagramNode[] = [];
+    const generatedEdges: DiagramEdge[] = [];
+
+    // Central Root Node
+    const coreId = `mm-core-${Date.now()}`;
+    const coreX = 600;
+    const coreY = 350;
+    const coreWidth = 140;
+    const coreHeight = 65;
+
+    generatedNodes.push({
+      id: coreId,
+      type: 'mindmap-oval',
+      label: centralTopic,
+      x: coreX,
+      y: coreY,
+      width: coreWidth,
+      height: coreHeight,
+      style: {
+        fill: 'rgba(124, 58, 237, 0.95)',
+        stroke: '#c084fc',
+        strokeWidth: 3,
+        textColor: '#ffffff',
+        gradient: true,
+      },
+      data: { level: 0 },
+      documentation: {
+        description: centralDescription,
+        status: 'approved',
+        tags: ['MindMap', 'CentralTopic'],
+      },
+    });
+
+    const defaultColors = ['#3b82f6', '#10b981', '#f59e0b', '#ec4899', '#8b5cf6', '#06b6d4'];
+
+    // Split branches evenly between left and right sides
+    const leftBranches: any[] = [];
+    const rightBranches: any[] = [];
+    branches.forEach((b: any, index: number) => {
+      if (index % 2 === 0) {
+        leftBranches.push({ ...b, originalIndex: index });
+      } else {
+        rightBranches.push({ ...b, originalIndex: index });
+      }
+    });
+
+    // Helper to position branches
+    const layoutBranchGroup = (
+      group: any[],
+      side: 'left' | 'right'
+    ) => {
+      const count = group.length;
+      if (count === 0) return;
+
+      const spacingY = 170;
+      const startY = coreY - ((count - 1) * spacingY) / 2;
+      const branchX = side === 'left' ? coreX - 280 : coreX + 280;
+      const subX = side === 'left' ? branchX - 250 : branchX + 250;
+
+      group.forEach((b: any, bIdx: number) => {
+        const branchId = `mm-branch-${b.originalIndex}-${Date.now()}`;
+        const branchY = startY + bIdx * spacingY;
+        const color = b.color || defaultColors[b.originalIndex % defaultColors.length];
+
+        // Level 1 Branch Node
+        generatedNodes.push({
+          id: branchId,
+          type: 'mindmap-oval',
+          label: b.title,
+          x: branchX,
+          y: branchY,
+          width: 110,
+          height: 52,
+          style: {
+            fill: `${color}E6`,
+            stroke: color,
+            strokeWidth: 2,
+            textColor: '#ffffff',
+            gradient: true,
+          },
+          data: { level: 1 },
+          documentation: {
+            description: b.description,
+            status: 'approved',
+            tags: ['MindMap', 'Concept'],
+          },
+        });
+
+        // Edge from Central Node to Branch
+        generatedEdges.push({
+          id: `edge-${coreId}-${branchId}`,
+          sourceNodeId: coreId,
+          targetNodeId: branchId,
+          sourceAnchor: side === 'left' ? 'left' : 'right',
+          targetAnchor: side === 'left' ? 'right' : 'left',
+          type: 'curved',
+          lineStyle: 'solid',
+          markerStart: 'none',
+          markerEnd: 'none',
+          color: color,
+          strokeWidth: 2.5,
+        });
+
+        // Level 2 Sub-branches
+        const subbranches = Array.isArray(b.subbranches) ? b.subbranches : [];
+        const subCount = subbranches.length;
+        if (subCount > 0) {
+          const subSpacingY = 55;
+          const subStartY = branchY - ((subCount - 1) * subSpacingY) / 2;
+
+          subbranches.forEach((sub: any, sIdx: number) => {
+            const subId = `mm-sub-${b.originalIndex}-${sIdx}-${Date.now()}`;
+            const subY = subStartY + sIdx * subSpacingY;
+
+            generatedNodes.push({
+              id: subId,
+              type: 'mindmap-oval',
+              label: sub.title,
+              x: subX,
+              y: subY,
+              width: 90,
+              height: 45,
+              style: {
+                fill: `${color}B3`,
+                stroke: color,
+                strokeWidth: 1.5,
+                textColor: '#ffffff',
+                gradient: true,
+              },
+              data: { level: 2 },
+              documentation: {
+                description: sub.description,
+                status: 'approved',
+                tags: ['MindMap', 'Subtopic'],
+              },
+            });
+
+            // Edge from Branch to Sub-branch
+            generatedEdges.push({
+              id: `edge-${branchId}-${subId}`,
+              sourceNodeId: branchId,
+              targetNodeId: subId,
+              sourceAnchor: side === 'left' ? 'left' : 'right',
+              targetAnchor: side === 'left' ? 'right' : 'left',
+              type: 'curved',
+              lineStyle: 'solid',
+              markerStart: 'none',
+              markerEnd: 'none',
+              color: color,
+              strokeWidth: 2,
+            });
+          });
+        }
+      });
+    };
+
+    layoutBranchGroup(leftBranches, 'left');
+    layoutBranchGroup(rightBranches, 'right');
+
+    const durationMs = Date.now() - startTime;
+    logDebug(
+      'success',
+      'GEMINI_AI',
+      `Generated mind map "${title}" with ${generatedNodes.length} nodes and ${generatedEdges.length} edges in ${durationMs}ms`
+    );
+
+    res.json({
+      success: true,
+      title,
+      description: centralDescription,
+      nodes: generatedNodes,
+      edges: generatedEdges,
+      durationMs,
+    });
+  } catch (err: any) {
+    const durationMs = Date.now() - startTime;
+    logDebug('error', 'GEMINI_AI', `Failed to generate mind map: ${err.message}`, err.stack);
+    res.status(500).json({
+      success: false,
+      error: err.message || 'Failed to generate mind map with Gemini AI',
+      details: String(err?.stack || err),
+    });
   }
 });
 

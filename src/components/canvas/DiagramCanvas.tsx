@@ -25,6 +25,7 @@ import {
   RotateCcw,
   Database,
   Upload,
+  Sparkles,
 } from 'lucide-react';
 
 import { ContextMenu, ContextMenuPosition } from './ContextMenu';
@@ -68,6 +69,7 @@ interface DiagramCanvasProps {
   onOpenChildDiagramModal?: (node: DiagramNode) => void;
   onNavigateChildDiagram?: (filename: string) => void;
   onOpenImportSqlModal?: () => void;
+  onOpenGenerateMindmapModal?: () => void;
 }
 
 export const DiagramCanvas: React.FC<DiagramCanvasProps> = ({
@@ -100,6 +102,7 @@ export const DiagramCanvas: React.FC<DiagramCanvasProps> = ({
   onOpenChildDiagramModal,
   onNavigateChildDiagram,
   onOpenImportSqlModal,
+  onOpenGenerateMindmapModal,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const themeDef = THEMES[theme] || THEMES.dark;
@@ -148,7 +151,7 @@ export const DiagramCanvas: React.FC<DiagramCanvasProps> = ({
   const [dragStartPos, setDragStartPos] = useState({ x: 0, y: 0 });
   const [initialDragPositions, setInitialDragPositions] = useState<Record<string, { x: number; y: number }>>({});
 
-  // Node Resizing state
+  // Node Resizing state (supports synchronized resizing of all selected nodes of the same type)
   const [resizing, setResizing] = useState<{
     nodeId: string;
     direction: 'se' | 'e' | 's' | 'sw' | 'ne' | 'nw' | 'n' | 'w';
@@ -158,6 +161,13 @@ export const DiagramCanvas: React.FC<DiagramCanvasProps> = ({
     initialY: number;
     initialWidth: number;
     initialHeight: number;
+    coSelectedNodes?: Array<{
+      id: string;
+      initialX: number;
+      initialY: number;
+      initialWidth: number;
+      initialHeight: number;
+    }>;
   } | null>(null);
 
   // New Edge drawing state
@@ -361,7 +371,7 @@ export const DiagramCanvas: React.FC<DiagramCanvasProps> = ({
     setContextMenu({ x: e.clientX, y: e.clientY, nodeId: null, edgeId });
   };
 
-  // Start Resizing a node from handles
+  // Start Resizing a node from handles (Change 2: capture all selected nodes of matching node type)
   const handleStartResize = (
     nodeId: string,
     direction: 'se' | 'e' | 's' | 'sw' | 'ne' | 'nw' | 'n' | 'w',
@@ -371,6 +381,29 @@ export const DiagramCanvas: React.FC<DiagramCanvasProps> = ({
     const targetNode = nodes.find(n => n.id === nodeId);
     if (!targetNode) return;
     const canvasCoords = screenToCanvasCoords(e.clientX, e.clientY);
+
+    // If multiple nodes are selected, find all selected nodes that have the same shape/node type
+    const isTargetSelected = effectiveSelectedNodeIds.includes(nodeId);
+    const coSelected = isTargetSelected
+      ? nodes
+          .filter(n => effectiveSelectedNodeIds.includes(n.id) && n.type === targetNode.type)
+          .map(n => ({
+            id: n.id,
+            initialX: n.x,
+            initialY: n.y,
+            initialWidth: n.width,
+            initialHeight: n.height,
+          }))
+      : [
+          {
+            id: targetNode.id,
+            initialX: targetNode.x,
+            initialY: targetNode.y,
+            initialWidth: targetNode.width,
+            initialHeight: targetNode.height,
+          },
+        ];
+
     setResizing({
       nodeId,
       direction,
@@ -380,6 +413,7 @@ export const DiagramCanvas: React.FC<DiagramCanvasProps> = ({
       initialY: targetNode.y,
       initialWidth: targetNode.width,
       initialHeight: targetNode.height,
+      coSelectedNodes: coSelected,
     });
   };
 
@@ -627,74 +661,118 @@ export const DiagramCanvas: React.FC<DiagramCanvasProps> = ({
         return;
       }
 
-      // Handle Node Resizing
+      // Handle Node Resizing (Change 2: applied to all selected items of matching node type)
       if (resizing && !isReadOnly) {
-        const nodeIndex = nodes.findIndex(n => n.id === resizing.nodeId);
-        if (nodeIndex !== -1) {
-          const deltaX = canvasCoords.x - resizing.startX;
-          const deltaY = canvasCoords.y - resizing.startY;
-          let newX = resizing.initialX;
-          let newY = resizing.initialY;
-          let newWidth = resizing.initialWidth;
-          let newHeight = resizing.initialHeight;
+        const deltaX = canvasCoords.x - resizing.startX;
+        const deltaY = canvasCoords.y - resizing.startY;
+        let newX = resizing.initialX;
+        let newY = resizing.initialY;
+        let newWidth = resizing.initialWidth;
+        let newHeight = resizing.initialHeight;
 
-          const minWidth = 40;
-          const minHeight = 35;
+        const minWidth = 40;
+        const minHeight = 35;
 
-          switch (resizing.direction) {
-            case 'se':
-              newWidth = Math.max(minWidth, resizing.initialWidth + deltaX);
-              newHeight = Math.max(minHeight, resizing.initialHeight + deltaY);
-              break;
-            case 'e':
-              newWidth = Math.max(minWidth, resizing.initialWidth + deltaX);
-              break;
-            case 's':
-              newHeight = Math.max(minHeight, resizing.initialHeight + deltaY);
-              break;
-            case 'sw':
-              newWidth = Math.max(minWidth, resizing.initialWidth - deltaX);
-              newX = resizing.initialX + (resizing.initialWidth - newWidth);
-              newHeight = Math.max(minHeight, resizing.initialHeight + deltaY);
-              break;
-            case 'ne':
-              newWidth = Math.max(minWidth, resizing.initialWidth + deltaX);
-              newHeight = Math.max(minHeight, resizing.initialHeight - deltaY);
-              newY = resizing.initialY + (resizing.initialHeight - newHeight);
-              break;
-            case 'nw':
-              newWidth = Math.max(minWidth, resizing.initialWidth - deltaX);
-              newX = resizing.initialX + (resizing.initialWidth - newWidth);
-              newHeight = Math.max(minHeight, resizing.initialHeight - deltaY);
-              newY = resizing.initialY + (resizing.initialHeight - newHeight);
-              break;
-            case 'n':
-              newHeight = Math.max(minHeight, resizing.initialHeight - deltaY);
-              newY = resizing.initialY + (resizing.initialHeight - newHeight);
-              break;
-            case 'w':
-              newWidth = Math.max(minWidth, resizing.initialWidth - deltaX);
-              newX = resizing.initialX + (resizing.initialWidth - newWidth);
-              break;
-          }
-
-          if (gridSnap) {
-            newWidth = Math.round(newWidth / 20) * 20;
-            newHeight = Math.round(newHeight / 20) * 20;
-            newX = Math.round(newX / 20) * 20;
-            newY = Math.round(newY / 20) * 20;
-          }
-
-          const updatedNodes = [...nodes];
-          updatedNodes[nodeIndex] = {
-            ...updatedNodes[nodeIndex],
-            x: newX,
-            y: newY,
-            width: newWidth,
-            height: newHeight,
-          };
-          onUpdateNodes(updatedNodes);
+        switch (resizing.direction) {
+          case 'se':
+            newWidth = Math.max(minWidth, resizing.initialWidth + deltaX);
+            newHeight = Math.max(minHeight, resizing.initialHeight + deltaY);
+            break;
+          case 'e':
+            newWidth = Math.max(minWidth, resizing.initialWidth + deltaX);
+            break;
+          case 's':
+            newHeight = Math.max(minHeight, resizing.initialHeight + deltaY);
+            break;
+          case 'sw':
+            newWidth = Math.max(minWidth, resizing.initialWidth - deltaX);
+            newX = resizing.initialX + (resizing.initialWidth - newWidth);
+            newHeight = Math.max(minHeight, resizing.initialHeight + deltaY);
+            break;
+          case 'ne':
+            newWidth = Math.max(minWidth, resizing.initialWidth + deltaX);
+            newHeight = Math.max(minHeight, resizing.initialHeight - deltaY);
+            newY = resizing.initialY + (resizing.initialHeight - newHeight);
+            break;
+          case 'nw':
+            newWidth = Math.max(minWidth, resizing.initialWidth - deltaX);
+            newX = resizing.initialX + (resizing.initialWidth - newWidth);
+            newHeight = Math.max(minHeight, resizing.initialHeight - deltaY);
+            newY = resizing.initialY + (resizing.initialHeight - newHeight);
+            break;
+          case 'n':
+            newHeight = Math.max(minHeight, resizing.initialHeight - deltaY);
+            newY = resizing.initialY + (resizing.initialHeight - newHeight);
+            break;
+          case 'w':
+            newWidth = Math.max(minWidth, resizing.initialWidth - deltaX);
+            newX = resizing.initialX + (resizing.initialWidth - newWidth);
+            break;
         }
+
+        if (gridSnap) {
+          newWidth = Math.round(newWidth / 20) * 20;
+          newHeight = Math.round(newHeight / 20) * 20;
+          newX = Math.round(newX / 20) * 20;
+          newY = Math.round(newY / 20) * 20;
+        }
+
+        // Apply resize to the dragged node AND all co-selected nodes of the same type
+        const coSelectedList = resizing.coSelectedNodes && resizing.coSelectedNodes.length > 0
+          ? resizing.coSelectedNodes
+          : [{ id: resizing.nodeId, initialX: resizing.initialX, initialY: resizing.initialY, initialWidth: resizing.initialWidth, initialHeight: resizing.initialHeight }];
+
+        const coMap = new Map(coSelectedList.map(c => [c.id, c]));
+
+        const affectsWidth = ['se', 'e', 'sw', 'ne', 'nw', 'w'].includes(resizing.direction);
+        const affectsHeight = ['se', 's', 'sw', 'ne', 'nw', 'n'].includes(resizing.direction);
+
+        const updatedNodes = nodes.map(n => {
+          const co = coMap.get(n.id);
+          if (!co) return n;
+
+          if (n.id === resizing.nodeId) {
+            return {
+              ...n,
+              x: newX,
+              y: newY,
+              width: newWidth,
+              height: newHeight,
+            };
+          }
+
+          // For other selected nodes of the exact same type, apply the synchronized dimensions
+          let coW = n.width;
+          let coH = n.height;
+          let coX = co.initialX;
+          let coY = co.initialY;
+
+          if (affectsWidth) {
+            coW = newWidth;
+            if (resizing.direction.includes('w')) {
+              coX = co.initialX + (co.initialWidth - newWidth);
+              if (gridSnap) coX = Math.round(coX / 20) * 20;
+            }
+          }
+
+          if (affectsHeight) {
+            coH = newHeight;
+            if (resizing.direction.includes('n')) {
+              coY = co.initialY + (co.initialHeight - newHeight);
+              if (gridSnap) coY = Math.round(coY / 20) * 20;
+            }
+          }
+
+          return {
+            ...n,
+            x: coX,
+            y: coY,
+            width: coW,
+            height: coH,
+          };
+        });
+
+        onUpdateNodes(updatedNodes);
         return;
       }
 
@@ -1548,6 +1626,76 @@ export const DiagramCanvas: React.FC<DiagramCanvasProps> = ({
           })}
       </div>
 
+      {/* Empty State Overlay for Mind Map & Other Diagrams */}
+      {nodes.length === 0 && (
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none p-6 z-20">
+          <div
+            className={`max-w-md w-full p-6 rounded-2xl border shadow-2xl backdrop-blur-md pointer-events-auto text-center animate-in fade-in zoom-in-95 duration-200 ${
+              themeDef.isDark
+                ? 'bg-slate-900/90 border-slate-700/80 text-slate-200'
+                : 'bg-white/95 border-slate-200 text-slate-800'
+            }`}
+          >
+            {diagramType === 'mindmap' ? (
+              <>
+                <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-purple-600 to-indigo-500 flex items-center justify-center mx-auto mb-4 shadow-lg shadow-purple-500/25">
+                  <Sparkles className="w-7 h-7 text-white animate-pulse" />
+                </div>
+                <h3 className="text-lg font-bold mb-1.5">
+                  Empty Mind Map
+                </h3>
+                <p className="text-xs text-slate-400 mb-5 leading-relaxed">
+                  Generate a complete mind map with central topic, labeled branch nodes, descriptions, and curved connector lines using Gemini AI.
+                </p>
+                {onOpenGenerateMindmapModal && (
+                  <button
+                    type="button"
+                    onClick={onOpenGenerateMindmapModal}
+                    className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white rounded-xl text-xs font-semibold cursor-pointer transition-all shadow-md shadow-purple-600/30 hover:shadow-lg active:scale-[0.98]"
+                  >
+                    <Sparkles className="w-4 h-4 text-purple-200" />
+                    <span>Generate Mind Map with Gemini AI</span>
+                  </button>
+                )}
+                <div className="mt-3 text-[11px] text-slate-500">
+                  Or drag a shape from the left toolbox to build manually
+                </div>
+              </>
+            ) : diagramType === 'erd' && onOpenImportSqlModal ? (
+              <>
+                <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-sky-600 to-blue-500 flex items-center justify-center mx-auto mb-4 shadow-lg shadow-sky-500/25">
+                  <Database className="w-7 h-7 text-white" />
+                </div>
+                <h3 className="text-lg font-bold mb-1.5">
+                  Empty ERD Diagram
+                </h3>
+                <p className="text-xs text-slate-400 mb-5 leading-relaxed">
+                  Upload an ERwin PostgreSQL SQL file (.sql) to automatically populate entity tables, primary/foreign keys, and crow's foot relationships.
+                </p>
+                <button
+                  type="button"
+                  onClick={onOpenImportSqlModal}
+                  className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-sky-600 hover:bg-sky-500 text-white rounded-xl text-xs font-semibold cursor-pointer transition-all shadow-md shadow-sky-600/30 hover:shadow-lg active:scale-[0.98]"
+                >
+                  <Upload className="w-4 h-4" />
+                  <span>Upload ERwin / Postgres SQL</span>
+                </button>
+              </>
+            ) : (
+              <>
+                <div className="w-12 h-12 rounded-xl bg-slate-800/80 flex items-center justify-center mx-auto mb-3">
+                  <Compass className="w-6 h-6 text-slate-400" />
+                </div>
+                <h3 className="text-sm font-semibold mb-1">Canvas is Empty</h3>
+                <p className="text-xs text-slate-400">
+                  Drag and drop shapes from the left palette to start diagramming.
+                </p>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Context Menu for right click */}
       <ContextMenu
         position={contextMenu}
@@ -1582,6 +1730,7 @@ export const DiagramCanvas: React.FC<DiagramCanvasProps> = ({
         onNavigateChildDiagram={onNavigateChildDiagram}
         onOpenChildDiagramModal={onOpenChildDiagramModal}
         onOpenImportSqlModal={onOpenImportSqlModal}
+        onOpenGenerateMindmapModal={onOpenGenerateMindmapModal}
         isReadOnly={isReadOnly}
       />
 
